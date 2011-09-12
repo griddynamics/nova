@@ -348,7 +348,7 @@ class ISCSIDriver(VolumeDriver):
     We make use of model provider properties as follows:
 
     :provider_location:    if present, contains the iSCSI target information
-                           in the same format as an ietadm discovery
+                           in the same format as an tgtadm discovery
                            i.e. '<ip>:<port>,<portal> <target IQN>'
 
     :provider_auth:    if present, contains a space-separated triple:
@@ -368,17 +368,22 @@ class ISCSIDriver(VolumeDriver):
 
         iscsi_name = "%s%s" % (FLAGS.iscsi_target_prefix, volume['name'])
         volume_path = "/dev/%s/%s" % (FLAGS.volume_group, volume['name'])
-        self._sync_exec('ietadm', '--op', 'new',
+        self._sync_exec('tgtadm', '--op', 'new',
+                        '--lld=iscsi', '--mode=target',
                         "--tid=%s" % iscsi_target,
-                        '--params',
-                        "Name=%s" % iscsi_name,
+                        "--targetname=%s" % iscsi_name,
                         run_as_root=True,
                         check_exit_code=False)
-        self._sync_exec('ietadm', '--op', 'new',
+        self._sync_exec('tgtadm', '--op', 'bind',
+                        '--lld=iscsi', '--mode=target', '--initiator-address=ALL',
                         "--tid=%s" % iscsi_target,
-                        '--lun=0',
-                        '--params',
-                        "Path=%s,Type=fileio" % volume_path,
+                        run_as_root=True,
+                        check_exit_code=False)
+        self._sync_exec('tgtadm', '--op', 'new',
+                        '--lld=iscsi', '--mode=logicalunit',
+                        "--tid=%s" % iscsi_target,
+                        '--lun=1',
+                        "--backing-store=%s,Type=fileio" % volume_path,
                         run_as_root=True,
                         check_exit_code=False)
 
@@ -400,13 +405,21 @@ class ISCSIDriver(VolumeDriver):
                                                       volume['host'])
         iscsi_name = "%s%s" % (FLAGS.iscsi_target_prefix, volume['name'])
         volume_path = "/dev/%s/%s" % (FLAGS.volume_group, volume['name'])
-        self._execute('ietadm', '--op', 'new',
-                      '--tid=%s' % iscsi_target,
-                      '--params', 'Name=%s' % iscsi_name, run_as_root=True)
-        self._execute('ietadm', '--op', 'new',
-                      '--tid=%s' % iscsi_target,
-                      '--lun=0', '--params',
-                      'Path=%s,Type=fileio' % volume_path, run_as_root=True)
+        self._execute('tgtadm', '--op', 'new',
+                      '--lld=iscsi', '--mode=target',
+                      "--tid=%s" % iscsi_target,
+                      "--targetname=%s" % iscsi_name,
+                      run_as_root=True)
+        self._execute('tgtadm', '--op', 'bind',
+                      '--lld=iscsi', '--mode=target', '--initiator-address=ALL',
+                      "--tid=%s" % iscsi_targe,
+                      run_as_root=True)
+        self._execute('tgtadm', '--op', 'new',
+                      '--lld=iscsi', '--mode=logicalunit',
+                      "--tid=%s" % iscsi_target,
+                      '--lun=1',
+                      "--backing-store=%s,Type=fileio" % volume_path,
+                      run_as_root=True)
 
     def remove_export(self, context, volume):
         """Removes an export for a logical volume."""
@@ -419,19 +432,22 @@ class ISCSIDriver(VolumeDriver):
             return
 
         try:
-            # ietadm show will exit with an error
+            # tgtadm show will exit with an error
             # this export has already been removed
-            self._execute('ietadm', '--op', 'show',
+            self._execute('tgtadm', '--op', 'show',
+                          '--lld=iscsi', '--mode=target',
                           '--tid=%s' % iscsi_target, run_as_root=True)
         except Exception as e:
             LOG.info(_("Skipping remove_export. No iscsi_target " +
                        "is presently exported for volume: %d"), volume['id'])
             return
 
-        self._execute('ietadm', '--op', 'delete',
+        self._execute('tgtadm', '--op', 'delete',
+                      '--lld=iscsi', '--mode=logicalunit',
                       '--tid=%s' % iscsi_target,
-                      '--lun=0', run_as_root=True)
-        self._execute('ietadm', '--op', 'delete',
+                      '--lun=1', run_as_root=True)
+        self._execute('tgtadm', '--op', 'delete',
+                      '--lld=iscsi', '--mode=target',
                       '--tid=%s' % iscsi_target, run_as_root=True)
 
     def _do_iscsi_discovery(self, volume):
@@ -541,7 +557,7 @@ class ISCSIDriver(VolumeDriver):
 
         self._iscsiadm_update(iscsi_properties, "node.startup", "automatic")
 
-        mount_device = ("/dev/disk/by-path/ip-%s-iscsi-%s-lun-0" %
+        mount_device = ("/dev/disk/by-path/ip-%s-iscsi-%s-lun-1" %
                         (iscsi_properties['target_portal'],
                          iscsi_properties['target_iqn']))
 
@@ -583,7 +599,8 @@ class ISCSIDriver(VolumeDriver):
 
         tid = self.db.volume_get_iscsi_target_num(context, volume_id)
         try:
-            self._execute('ietadm', '--op', 'show',
+            self._execute('tgtadm', '--op', 'show',
+                          '--lld=iscsi', '--mode=target',
                           '--tid=%(tid)d' % locals(), run_as_root=True)
         except exception.ProcessExecutionError, e:
             # Instances remount read-only in this case.
