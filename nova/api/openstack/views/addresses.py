@@ -92,14 +92,14 @@ class ViewBuilderV11(ViewBuilder):
 
     def _extract_ipv4_addresses(self, interface):
         for fixed_ip in interface['fixed_ips']:
-            yield self._build_ip_entity(fixed_ip['address'], 4)
+            yield self._build_ip_entity(fixed_ip['address'], 4, 1)
             for floating_ip in fixed_ip.get('floating_ips', []):
-                yield self._build_ip_entity(floating_ip['address'], 4)
+                yield self._build_ip_entity(floating_ip['address'], 4, 0)
 
     def _extract_ipv6_address(self, interface):
         fixed_ipv6 = interface.get('fixed_ipv6')
         if fixed_ipv6 is not None:
             return self._build_ip_entity(fixed_ipv6, 6)
 
-    def _build_ip_entity(self, address, version):
-        return {'addr': address, 'version': version}
+    def _build_ip_entity(self, address, version, is_fixed):
+        return {'addr': address, 'version': version, "fixed": is_fixed}
