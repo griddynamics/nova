@@ -32,7 +32,7 @@
                 <cmdline>ro</cmdline>
             #else
                 #set $root_device_name = $getVar('root_device_name', '/dev/vda')
-                <cmdline>root=${root_device_name} console=ttyS0</cmdline>
+                <cmdline>root=${root_device_name} console=ttyS0 selinux=0</cmdline>
             #end if
             #if $getVar('ramdisk', None)
                 <initrd>${ramdisk}</initrd>
