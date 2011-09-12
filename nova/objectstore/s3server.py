@@ -125,6 +125,8 @@ class BaseRequestHandler(object):
         self.response = webob.Response()
         params = request.environ['wsgiorg.routing_args'][1]
         del params['controller']
+        if 'action' in params:
+            del params['action']
         f(**params)
         return self.response
 
