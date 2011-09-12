@@ -700,7 +700,7 @@ class LibvirtConnection(driver.ComputeDriver):
                 port = random.randint(int(start_port), int(end_port))
                 # netcat will exit with 0 only if the port is in use,
                 # so a nonzero return value implies it is unused
-                cmd = 'netcat', '0.0.0.0', port, '-w', '1'
+                cmd = 'nc', '0.0.0.0', port, '-w', '1'
                 try:
                     stdout, stderr = utils.execute(*cmd, process_input='')
                 except exception.ProcessExecutionError:
