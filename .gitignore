@@ -11,3 +11,4 @@ build-stamp
 nova.egg-info
 .nova-venv
 .venv
+.idea/

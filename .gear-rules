@@ -1,0 +1,7 @@
+copy: redhat/*.init
+copy: redhat/openstack-nova-rhel-ifc-template
+copy: redhat/openstack-nova-sudoers
+copy: redhat/openstack-nova-polkit.pkla
+copy: redhat/openstack-nova-README.rhel6
+copy: redhat/openstack-nova.logrotate
+tar.gz: . name=nova-@version@ base=nova-@version@
