@@ -32,8 +32,11 @@ from nova import flags
 from nova import log as logging
 from nova import utils
 from nova.virt.injector import GuestFsInjector
+<<<<<<< HEAD
 from nova.virt.netcfg import NetConfig
 from crypt import crypt
+=======
+>>>>>>> Use GuestFS to inject files with libvirt
 
 
 LOG = logging.getLogger('nova.compute.disk')
@@ -110,28 +113,46 @@ def inject_fs(image, fs_type='ext3'):
     gfs.mkfs(fs_type, devices[-1])
     gfs.sync()
 
+<<<<<<< HEAD
 def inject_data(image, key=None, nets=None, metadata=None, injected_files=None, admin_pass=None):
+=======
+def inject_data(image, key=None, net=None, metadata=None):
+>>>>>>> Use GuestFS to inject files with libvirt
     """Injects a ssh key and optionally net data into a disk image.
 
     It will use GuestFS to inject files.
     """
     with GuestFsInjector(image) as injector:
+<<<<<<< HEAD
         inject_data_into_fs(injector, key, nets, metadata, injected_files, admin_pass)
 
 
 def inject_data_into_fs(injector, key=None, nets=None, metadata=None, injected_files=None, admin_pass=None):
+=======
+        inject_data_into_fs(injector, key, net, metadata)
+
+
+def inject_data_into_fs(injector, key, net, metadata):
+>>>>>>> Use GuestFS to inject files with libvirt
     """Injects data into a root filesystem using injector.
     """
     if injected_files and len(injected_files):
         _inject_files_into_fs(injected_files, injector)
     if key:
         _inject_key_into_fs(key, injector)
+<<<<<<< HEAD
     if nets and len(nets):
         _inject_net_into_fs(nets, injector)
     if metadata:
         _inject_metadata_into_fs(metadata, injector)
     if admin_pass:
         _inject_passw_into_fs(admin_pass, injector)
+=======
+    if net:
+        _inject_net_into_fs(net, injector)
+    if metadata:
+        _inject_metadata_into_fs(metadata, injector)
+>>>>>>> Use GuestFS to inject files with libvirt
 
 
 def _inject_metadata_into_fs(metadata, injector):
@@ -139,7 +160,10 @@ def _inject_metadata_into_fs(metadata, injector):
     metadata_str = json.dumps(metadata)
     injector.write('meta.js', metadata_str)
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> Use GuestFS to inject files with libvirt
 def _inject_key_into_fs(key, injector):
     """Add the given public ssh key to root's authorized_keys.
 
@@ -150,15 +174,23 @@ def _inject_key_into_fs(key, injector):
     injector.mkdir_p(sshdir)
     injector.chmod(sshdir, 0o700)
     keyfile = os.path.join(sshdir, 'authorized_keys')
+<<<<<<< HEAD
     injector.write_append(keyfile,
         '\n# Injected by Nova key\n' + key.strip() + '\n')
 
 
 def _inject_net_into_fs(nets, injector):
+=======
+    injector.write_append(keyfile, '\n# Injected by Nova key\n' + key.strip() + '\n')
+
+
+def _inject_net_into_fs(net, injector):
+>>>>>>> Use GuestFS to inject files with libvirt
     """Inject /etc/network/interfaces into the filesystem use injector.
 
     net is the contents of /etc/network/interfaces.
     """
+<<<<<<< HEAD
     os_type = injector.get_os_type()
     nc = NetConfig(os_type)
     for cfg_name, content in nc.generate(nets):
@@ -183,3 +215,10 @@ def _inject_files_into_fs(injected_files, injector):
     for name, content in injected_files:
         injector.mkdir_p(os.path.dirname(name))
         injector.write(name, content)
+=======
+    netdir = '/etc/network'
+    injector.mkdir_p(netdir)
+    injector.chmod(netdir, 0o755)
+    netfile = os.path.join(netdir, 'interfaces')
+    injector.write(netfile, net)
+>>>>>>> Use GuestFS to inject files with libvirt

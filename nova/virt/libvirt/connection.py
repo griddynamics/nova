@@ -1110,6 +1110,7 @@ class LibvirtConnection(driver.ComputeDriver):
                            'nets into image %(img_id)s'
                            % locals()))
             try:
+<<<<<<< HEAD
                 #libvirt change permissions to root workaround
                 def change_owner(path):
                     utils.execute('chown', 'nova:nova', path, run_as_root=True)
@@ -1119,6 +1120,10 @@ class LibvirtConnection(driver.ComputeDriver):
 
                 change_owner(image.path())
                 disk.inject_data(image.path(), key, nets, metadata, injected_files, admin_pass)
+=======
+                disk.inject_data(injection_path, key, net, metadata)
+
+>>>>>>> Use GuestFS to inject files with libvirt
             except Exception as e:
                 # This could be a windows image, or a vmdk format disk
                 LOG.warn(_('instance %(inst_name)s: ignoring error injecting'
