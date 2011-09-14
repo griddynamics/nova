@@ -1016,10 +1016,7 @@ class LibvirtConnection(driver.ComputeDriver):
                                '%(injection)s into image %(img_id)s'
                                % locals()))
             try:
-                disk.inject_data(injection_path, key, net, metadata,
-                                 partition=target_partition,
-                                 nbd=FLAGS.use_cow_images,
-                                 tune2fs=tune2fs)
+                disk.inject_data(injection_path, key, net, metadata)
 
             except Exception as e:
                 # This could be a windows image, or a vmdk format disk

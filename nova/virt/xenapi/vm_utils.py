@@ -40,7 +40,7 @@ from nova import utils
 from nova.compute import instance_types
 from nova.compute import power_state
 from nova.virt import disk
-from nova.virt import images
+from nova.virt.injector import FileInjector
 from nova.virt.xenapi import HelperBase
 from nova.virt.xenapi.volume_utils import StorageError
 
@@ -1211,8 +1211,7 @@ def _mounted_processing(device, key, net, metadata):
                 if not _find_guest_agent(tmpdir, FLAGS.xenapi_agent_path):
                     LOG.info(_('Manipulating interface files '
                             'directly'))
-                    disk.inject_data_into_fs(tmpdir, key, net, metadata,
-                        utils.execute)
+                    disk.inject_data_into_fs(FileInjector(tmpdir), key, net, metadata)
             finally:
                 utils.execute('umount', dev_path, run_as_root=True)
         else:
