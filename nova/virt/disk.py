@@ -32,6 +32,7 @@ from nova import flags
 from nova import log as logging
 from nova import utils
 from nova.virt.injector import GuestFsInjector
+from nova.virt.netcfg import NetConfig
 
 
 LOG = logging.getLogger('nova.compute.disk')
@@ -40,9 +41,6 @@ flags.DEFINE_integer('minimum_root_size', 1024 * 1024 * 1024 * 10,
                      'minimum size in bytes of root partition')
 flags.DEFINE_integer('block_size', 1024 * 1024 * 256,
                      'block_size to use for dd')
-flags.DEFINE_string('injected_network_template',
-                    utils.abspath('virt/interfaces.template'),
-                    'Template file for injected network')
 flags.DEFINE_integer('timeout_nbd', 10,
                      'time to wait for a NBD device coming up')
 flags.DEFINE_integer('max_nbd_devices', 16,
@@ -101,22 +99,22 @@ def extend(image, size):
     utils.execute('resize2fs', image, check_exit_code=False)
 
 
-def inject_data(image, key=None, net=None, metadata=None):
+def inject_data(image, key=None, nets=None, metadata=None):
     """Injects a ssh key and optionally net data into a disk image.
 
     It will use GuestFS to inject files.
     """
     with GuestFsInjector(image) as injector:
-        inject_data_into_fs(injector, key, net, metadata)
+        inject_data_into_fs(injector, key, nets, metadata)
 
 
-def inject_data_into_fs(injector, key, net, metadata):
+def inject_data_into_fs(injector, key, nets, metadata):
     """Injects data into a root filesystem using injector.
     """
     if key:
         _inject_key_into_fs(key, injector)
-    if net:
-        _inject_net_into_fs(net, injector)
+    if nets and len(nets):
+        _inject_net_into_fs(nets, injector)
     if metadata:
         _inject_metadata_into_fs(metadata, injector)
 
@@ -139,13 +137,13 @@ def _inject_key_into_fs(key, injector):
     injector.write_append(keyfile, '\n# Injected by Nova key\n' + key.strip() + '\n')
 
 
-def _inject_net_into_fs(net, injector):
+def _inject_net_into_fs(nets, injector):
     """Inject /etc/network/interfaces into the filesystem use injector.
 
     net is the contents of /etc/network/interfaces.
     """
-    netdir = '/etc/network'
-    injector.mkdir_p(netdir)
-    injector.chmod(netdir, 0o755)
-    netfile = os.path.join(netdir, 'interfaces')
-    injector.write(netfile, net)
+    os_type = injector.get_os_type()
+    nc = NetConfig(os_type)
+    for cfg_name, content in nc.generate(nets):
+        injector.mkdir_p(os.path.dirname(cfg_name))
+        injector.write(cfg_name, content)

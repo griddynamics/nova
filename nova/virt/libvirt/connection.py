@@ -958,12 +958,10 @@ class LibvirtConnection(driver.ComputeDriver):
             key = str(inst['key_data'])
         else:
             key = None
-        net = None
 
         nets = []
         ifc_template = open(FLAGS.injected_network_template).read()
         ifc_num = -1
-        have_injected_networks = False
         admin_context = nova_context.get_admin_context()
         for (network_ref, mapping) in network_info:
             ifc_num += 1
@@ -971,7 +969,6 @@ class LibvirtConnection(driver.ComputeDriver):
             if not network_ref['injected']:
                 continue
 
-            have_injected_networks = True
             address = mapping['ips'][0]['ip']
             netmask = mapping['ips'][0]['netmask']
             address_v6 = None
@@ -988,17 +985,12 @@ class LibvirtConnection(driver.ComputeDriver):
                    'broadcast': mapping['broadcast'],
                    'dns': ' '.join(mapping['dns']),
                    'address_v6': address_v6,
-                   'gateway6': gateway_v6,
+                   'gateway_v6': gateway_v6,
                    'netmask_v6': netmask_v6}
             nets.append(net_info)
 
-        if have_injected_networks:
-            net = str(Template(ifc_template,
-                               searchList=[{'interfaces': nets,
-                                            'use_ipv6': FLAGS.use_ipv6}]))
-
         metadata = inst.get('metadata')
-        if any((key, net, metadata)):
+        if any((key, len(nets), metadata)):
             inst_name = inst['name']
 
             if config_drive:  # Should be True or None by now.
@@ -1016,7 +1008,7 @@ class LibvirtConnection(driver.ComputeDriver):
                                '%(injection)s into image %(img_id)s'
                                % locals()))
             try:
-                disk.inject_data(injection_path, key, net, metadata)
+                disk.inject_data(injection_path, key, nets, metadata)
 
             except Exception as e:
                 # This could be a windows image, or a vmdk format disk

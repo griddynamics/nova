@@ -738,13 +738,13 @@ class VMHelper(HelperBase):
         # if at all, so determine whether it's required first, and then do
         # everything
         mount_required = False
-        key, net, metadata = _prepare_injectables(instance, network_info)
+        key, nets, metadata = _prepare_injectables(instance, network_info)
         mount_required = key or net or metadata
         if not mount_required:
             return
 
         with_vdi_attached_here(session, vdi_ref, False,
-                               lambda dev: _mounted_processing(dev, key, net,
+                               lambda dev: _mounted_processing(dev, key, nets,
                                                                metadata))
 
     @classmethod
@@ -1197,7 +1197,7 @@ def _find_guest_agent(base_dir, agent_rel_path):
     return False
 
 
-def _mounted_processing(device, key, net, metadata):
+def _mounted_processing(device, key, nets, metadata):
     """Callback which runs with the image VDI attached"""
 
     dev_path = '/dev/' + device + '1'  # NB: Partition 1 hardcoded
@@ -1211,7 +1211,7 @@ def _mounted_processing(device, key, net, metadata):
                 if not _find_guest_agent(tmpdir, FLAGS.xenapi_agent_path):
                     LOG.info(_('Manipulating interface files '
                             'directly'))
-                    disk.inject_data_into_fs(FileInjector(tmpdir), key, net, metadata)
+                    disk.inject_data_into_fs(FileInjector(tmpdir), key, nets, metadata)
             finally:
                 utils.execute('umount', dev_path, run_as_root=True)
         else:
@@ -1227,25 +1227,16 @@ def _prepare_injectables(inst, networks_info):
     prepares the ssh key and the network configuration file to be
     injected into the disk image
     """
-    #do the import here - Cheetah.Template will be loaded
-    #only if injection is performed
-    from Cheetah import Template as t
-    template = t.Template
-    template_data = open(FLAGS.injected_network_template).read()
-
     metadata = inst['metadata']
     key = str(inst['key_data'])
-    net = None
+    interfaces_info = []
     if networks_info:
         ifc_num = -1
-        interfaces_info = []
-        have_injected_networks = False
         for (network_ref, info) in networks_info:
             ifc_num += 1
             if not network_ref['injected']:
                 continue
 
-            have_injected_networks = True
             ip_v4 = ip_v6 = None
             if 'ips' in info and len(info['ips']) > 0:
                 ip_v4 = info['ips'][0]
@@ -1266,9 +1257,4 @@ def _prepare_injectables(inst, networks_info):
                               'gateway_v6': ip_v6 and info['gateway6'] or '',
                               'use_ipv6': FLAGS.use_ipv6}
             interfaces_info.append(interface_info)
-
-        if have_injected_networks:
-            net = str(template(template_data,
-                                searchList=[{'interfaces': interfaces_info,
-                                            'use_ipv6': FLAGS.use_ipv6}]))
-    return key, net, metadata
+    return key, interfaces_info, metadata

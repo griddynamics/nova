@@ -38,6 +38,10 @@ class FileInjector:
     def root(self):
         return self.__root
 
+    def get_os_type(self):
+        # todo: implement some heuristic
+        return "ubuntu"
+
     def abs_path(self, path):
         p = path
         if p.startswith(os.path.sep):
@@ -122,8 +126,14 @@ class GuestFsInjector:
         self.__gfs = self.init_guestfs()
         self.__gfs.add_drive(image)
         self.__gfs.launch()
-        root = self.__find_root()
-        self.__gfs.mount(root, '/')
+        self.__root = self.__find_root()
+        self.__gfs.mount(self.__root, '/')
+        self.__os_type = None
+
+    def get_os_type(self):
+        if self.__os_type is None:
+            self.__os_type = g.inspect_get_distro(self.__root)
+        return self.__os_type
 
     def __find_root(self):
         roots = self.__gfs.inspect_os()
