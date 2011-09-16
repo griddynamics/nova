@@ -192,5 +192,5 @@ class GuestFsInjector:
         self.free()
 
     def free(self):
-        self.__gfs.unmount_all()
+        self.__gfs.umount_all()
         self.__gfs.sync()

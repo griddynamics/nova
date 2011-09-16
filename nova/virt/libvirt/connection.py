@@ -960,7 +960,6 @@ class LibvirtConnection(driver.ComputeDriver):
             key = None
 
         nets = []
-        ifc_template = open(FLAGS.injected_network_template).read()
         ifc_num = -1
         admin_context = nova_context.get_admin_context()
         for (network_ref, mapping) in network_info:
@@ -1002,11 +1001,15 @@ class LibvirtConnection(driver.ComputeDriver):
                 img_id = inst.image_ref
                 tune2fs = True
 
-            for injection in ('metadata', 'key', 'net'):
+            for injection in ('metadata', 'key'):
                 if locals()[injection]:
                     LOG.info(_('instance %(inst_name)s: injecting '
                                '%(injection)s into image %(img_id)s'
                                % locals()))
+            if len(nets):
+                LOG.info(_('instance %(inst_name)s: injecting '
+                           'nets into image %(img_id)s'
+                           % locals()))
             try:
                 disk.inject_data(injection_path, key, nets, metadata)
 
