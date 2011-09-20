@@ -99,18 +99,20 @@ def extend(image, size):
     utils.execute('resize2fs', image, check_exit_code=False)
 
 
-def inject_data(image, key=None, nets=None, metadata=None):
+def inject_data(image, key=None, nets=None, metadata=None, injected_files=None):
     """Injects a ssh key and optionally net data into a disk image.
 
     It will use GuestFS to inject files.
     """
     with GuestFsInjector(image) as injector:
-        inject_data_into_fs(injector, key, nets, metadata)
+        inject_data_into_fs(injector, key, nets, metadata, injected_files)
 
 
-def inject_data_into_fs(injector, key, nets, metadata):
+def inject_data_into_fs(injector, key=None, nets=None, metadata=None, injected_files=None):
     """Injects data into a root filesystem using injector.
     """
+    if injected_files and len(injected_files):
+        _inject_files_into_fs(injected_files, injector)
     if key:
         _inject_key_into_fs(key, injector)
     if nets and len(nets):
@@ -147,3 +149,8 @@ def _inject_net_into_fs(nets, injector):
     for cfg_name, content in nc.generate(nets):
         injector.mkdir_p(os.path.dirname(cfg_name))
         injector.write(cfg_name, content)
+
+def _inject_files_into_fs(injected_files, injector):
+    for name, content in injected_files:
+        injector.mkdir_p(os.path.dirname(name))
+        injector.write(name, content)
