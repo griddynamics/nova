@@ -412,7 +412,7 @@ class ISCSIDriver(VolumeDriver):
                       run_as_root=True)
         self._execute('tgtadm', '--op', 'bind',
                       '--lld=iscsi', '--mode=target', '--initiator-address=ALL',
-                      "--tid=%s" % iscsi_targe,
+                      "--tid=%s" % iscsi_target,
                       run_as_root=True)
         self._execute('tgtadm', '--op', 'new',
                       '--lld=iscsi', '--mode=logicalunit',
