@@ -23,6 +23,7 @@ an instance with it.
 """
 
 import os
+import stat
 import string
 import tempfile
 import zipfile
@@ -144,6 +145,7 @@ class CloudPipe(object):
             key_path = os.path.join(key_dir, '%s.pem' % key_name)
             with open(key_path, 'w') as f:
                 f.write(private_key)
+            os.chmod(key_path, stat.S_IRUSR)
         except (exception.Duplicate, os.error, IOError):
             pass
         return key_name
