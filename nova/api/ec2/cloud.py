@@ -1273,9 +1273,6 @@ class CloudController(object):
             except exception.NotFound:
                 instances = []
         for instance in instances:
-            if not context.is_admin:
-                if instance['image_ref'] == str(FLAGS.vpn_image_id):
-                    continue
             i = {}
             instance_id = instance['id']
             ec2_id = ec2utils.id_to_ec2_id(instance_id)
