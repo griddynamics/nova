@@ -582,7 +582,15 @@ class ComputeManager(manager.SchedulerDependentManager):
         instance_ref.injected_files = kwargs.get('injected_files', [])
         network_info = self.network_api.get_instance_nw_info(context,
                                                               instance_ref)
-        bd_mapping = self._setup_block_device_mapping(context, instance_id)
+
+        (swap, ephemerals,
+             block_device_mapping) = self._setup_block_device_mapping(
+                context, instance_id)
+        block_device_info = {
+                'root_device_name': instance_ref['root_device_name'],
+                'swap': swap,
+                'ephemerals': ephemerals,
+                'block_device_mapping': block_device_mapping}
 
         self._instance_update(context,
                               instance_id,
@@ -593,7 +601,7 @@ class ComputeManager(manager.SchedulerDependentManager):
         instance_ref.admin_pass = kwargs.get('new_pass',
                 utils.generate_password(FLAGS.password_length))
 
-        self.driver.spawn(context, instance_ref, network_info, bd_mapping)
+        self.driver.spawn(context, instance_ref, network_info, block_device_info)
 
         current_power_state = self._get_power_state(context, instance_ref)
         self._instance_update(context,
