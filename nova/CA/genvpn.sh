@@ -21,8 +21,8 @@
 NAME=$1
 SUBJ=$2
 
-mkdir -p projects/$NAME
-cd projects/$NAME
+#mkdir -p projects/$NAME
+#cd projects/$NAME
 
 # generate a server priv key
 openssl genrsa -out server.key 2048
@@ -32,5 +32,5 @@ openssl req -new -key server.key -out server.csr -batch -subj "$SUBJ"
 
 novauid=`getent passwd nova | awk -F: '{print $3}'`
 if [ ! -z "${novauid}" ] && [ "`id -u`" != "${novauid}" ]; then
-    sudo chown -R nova:nogroup .
+    sudo chown -R nova:nobody .
 fi
