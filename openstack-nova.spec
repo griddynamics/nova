@@ -57,7 +57,7 @@ Requires:         openstack-noVNC >= %{version}
 Requires:         python-nova = %{version}-%{release}
 Requires:         %{name}-config >= %{version}
 Requires:         sudo
-Requires:         euca2ools = 1:1.3.1-gd3
+Requires:         euca2ools = 1:1.3.1-gd4
 
 Requires(post):   chkconfig grep sudo libselinux-utils
 Requires(postun): initscripts
