@@ -155,7 +155,7 @@ Requires:         scsi-target-utils
 Requires:         lvm2
 Requires:         socat
 Requires:         coreutils
-Requires:         python-libguestfs
+Requires:         python-libguestfs >= 1.7.17
 Requires:         python-kombu
 
 %description -n   python-nova
