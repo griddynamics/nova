@@ -188,7 +188,7 @@ Group:            Applications/System
 Requires:         %{name} = %{version}-%{release}
 Requires:         start-stop-daemon
 Requires:         libvirt-python
-Requires:         libvirt >= 0.8.2
+Requires:         libvirt >= 0.8.7
 Requires:         libxml2-python
 Requires:         rabbitmq-server
 Requires:         python-cheetah
