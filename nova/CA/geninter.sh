@@ -33,7 +33,7 @@ touch index.txt
 # openssl req -new -sha256 -key private/cakey.pem -out ../../reqs/inter$NAME.csr -batch -subj "$SUBJ"
 openssl ca -gencrl -config ./openssl.cnf -out crl.pem
 if [ "`id -u`" != "`grep nova /etc/passwd | cut -d':' -f3`" ]; then
-    sudo chown -R nova:body .
+    sudo chown -R nova:nobody .
 fi
 # cd ../../
 # openssl ca -extensions v3_ca -days 365 -out INTER/$NAME/cacert.pem -in reqs/inter$NAME.csr -config openssl.cnf -batch
