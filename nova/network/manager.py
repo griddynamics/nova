@@ -640,6 +640,9 @@ class NetworkManager(manager.SchedulerDependentManager):
         instance_id = instance_ref['id']
         self._do_trigger_security_group_members_refresh_for_instance(
                                                                    instance_id)
+        if instance_ref['image_ref'] == str(FLAGS.vpn_image_id):
+            self.db.fixed_ip_disassociate(context, address)
+
         if FLAGS.force_dhcp_release:
             dev = self.driver.get_dev(fixed_ip_ref['network'])
             vif = self.db.virtual_interface_get_by_instance_and_network(
