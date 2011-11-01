@@ -245,10 +245,11 @@ def generate_vpn_files(project_id):
         return
     _ensure_project_folder(project_id)
     start = os.getcwd()
-    os.chdir(ca_folder())
+    os.chdir(project_folder)
     # TODO(vish): the shell scripts could all be done in python
     utils.execute('sh', genvpn_sh_path,
-                  project_id, _vpn_cert_subject(project_id))
+                  project_id, _vpn_cert_subject(project_id),  project_folder)
+
     with open(csr_fn, 'r') as csrfile:
         csr_text = csrfile.read()
     (serial, signed_csr) = sign_csr(csr_text, project_id)

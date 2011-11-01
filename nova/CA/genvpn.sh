@@ -20,9 +20,10 @@
 # This gets zipped and run on the cloudpipe-managed OpenVPN server
 NAME=$1
 SUBJ=$2
+DIR=$3
 
-#mkdir -p projects/$NAME
-#cd projects/$NAME
+mkdir -p $DIR
+cd $DIR
 
 # generate a server priv key
 openssl genrsa -out server.key 2048

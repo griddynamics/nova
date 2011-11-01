@@ -631,6 +631,7 @@ class NetworkManager(manager.SchedulerDependentManager):
 
     def deallocate_fixed_ip(self, context, address, **kwargs):
         """Returns a fixed ip to the pool."""
+        LOG.debug(_('Deallocated IP |%(address)s|'), locals(), context=context)
         self.db.fixed_ip_update(context, address,
                                 {'allocated': False,
                                  'virtual_interface_id': None})
