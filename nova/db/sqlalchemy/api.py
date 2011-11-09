@@ -1774,8 +1774,13 @@ def network_create_safe(context, values):
 def network_delete_safe(context, network_id):
     session = get_session()
     with session.begin():
-        network_ref = network_get(context, network_id=network_id, \
+        network_ref = network_get(context, network_id=network_id,
                                   session=session)
+
+        #Also delete all associated fixed IPs
+        for fixed_ip_ref in network_ref.fixed_ips:
+            session.delete(fixed_ip_ref)
+
         session.delete(network_ref)
 
 
