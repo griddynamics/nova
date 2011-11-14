@@ -233,17 +233,13 @@ class SecurityGroupRulesController(SecurityGroupController):
            defined in the given security group.
         """
         for rule in security_group.rules:
-            if 'group_id' in values:
-                if rule['group_id'] == values['group_id']:
-                    return True
-            else:
-                is_duplicate = True
-                for key in ('cidr', 'from_port', 'to_port', 'protocol'):
-                    if rule[key] != values[key]:
-                        is_duplicate = False
-                        break
-                if is_duplicate:
-                    return True
+            is_duplicate = True
+            for key in ('group_id', 'cidr', 'from_port', 'to_port', 'protocol'):
+                if values.get(key) and values[key] != rule.get(key):
+                    is_duplicate = False
+                    break
+            if is_duplicate:
+                return True
         return False
 
     def _rule_args_to_dict(self, context, to_port=None, from_port=None,
