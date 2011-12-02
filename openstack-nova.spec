@@ -53,7 +53,6 @@ BuildRequires:    python-webob
 BuildRequires:    intltool
 
 
-Requires:         openstack-noVNC >= %{version}
 Requires:         python-nova = %{version}-%{release}
 Requires:         %{name}-config >= %{version}
 Requires:         sudo
@@ -86,7 +85,6 @@ Requires:         %{name}-cc-config >= %{version}
 Requires:         %{name}-api = %{version}-%{release}
 Requires:         %{name}-compute = %{version}-%{release}
 Requires:         %{name}-network = %{version}-%{release}
-Requires:         openstack-noVNC = %{version}
 Requires:         %{name}-objectstore = %{version}-%{release}
 Requires:         %{name}-scheduler = %{version}-%{release}
 Requires:         %{name}-volume = %{version}-%{release}
@@ -615,6 +613,9 @@ fi
 %files node-compute
 
 %changelog
+* Tue Aug 29 2011 Alessio Ababilov <aababilov@griddynamics.com> - 2011.3
+- Drop openstack-noVNC dependency
+
 * Fri Aug 26 2011 Alessio Ababilov <aababilov@griddynamics.com> - 2011.3-0.20110826.1448
 - Fixed openstack-nova-scsi-target-utils-support.patch
 
