@@ -215,6 +215,22 @@ protocol, and the Redis KVS.
 
 This package contains the %{name} Network Controller.
 
+%package          vncproxy
+Summary:          A nova vncproxy server
+Group:            Applications/System
+
+Requires:         %{name} = %{version}-%{release}
+Requires:         start-stop-daemon
+Requires:         openstack-noVNC >= %{version}
+
+%description      vncproxy
+Nova is a cloud computing fabric controller (the main part of an IaaS system)
+built to match the popular AWS EC2 and S3 APIs. It is written in Python, using
+the Tornado and Twisted frameworks, and relies on the standard AMQP messaging
+protocol, and the Redis KVS.
+
+This package contains the %{name} VNC proxy.
+
 %package          objectstore
 Summary:          A nova objectstore server
 Group:            Applications/System
@@ -475,6 +491,22 @@ if [ $1 -eq 1 ] ; then
     /sbin/service %{name}-network condrestart
 fi
 
+# vncproxy
+
+%post vncproxy
+/sbin/chkconfig --add %{name}-vncproxy
+
+%preun vncproxy
+if [ $1 -eq 0 ] ; then
+    /sbin/service %{name}-vncproxy stop >/dev/null 2>&1
+    /sbin/chkconfig --del %{name}-vncproxy
+fi
+
+%postun vncproxy
+if [ $1 -eq 1 ] ; then
+    /sbin/service %{name}-vncproxy condrestart
+fi
+
 # objectstore
 
 %post objectstore
@@ -549,6 +581,8 @@ fi
 %{_sharedstatedir}/nova/networks
 %{_sharedstatedir}/nova/tmp
 
+%files vncproxy
+%defattr(-,root,root,-)
 %{_bindir}/nova-vncproxy
 %{_initrddir}/%{name}-vncproxy
 #%doc %{_sharedstatedir}/nova/noVNC/LICENSE.txt
