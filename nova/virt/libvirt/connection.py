@@ -990,7 +990,9 @@ class LibvirtConnection(driver.ComputeDriver):
 
         metadata = inst.get('metadata')
         injected_files = inst.get('injected_files') or []
-        if any((key, len(nets), metadata, len(injected_files))):
+        admin_pass = inst.get('admin_pass')
+
+        if any((key, len(nets), metadata, len(injected_files), admin_pass)):
             inst_name = inst['name']
 
             if config_drive:  # Should be True or None by now.
@@ -1001,7 +1003,6 @@ class LibvirtConnection(driver.ComputeDriver):
                 injection_path = basepath('disk')
                 img_id = inst.image_ref
                 tune2fs = True
-
             for injection in ('metadata', 'key'):
                 if locals()[injection]:
                     LOG.info(_('instance %(inst_name)s: injecting '
@@ -1012,13 +1013,13 @@ class LibvirtConnection(driver.ComputeDriver):
                            'nets into image %(img_id)s'
                            % locals()))
             try:
-                disk.inject_data(injection_path, key, nets, metadata, injected_files)
+                disk.inject_data(injection_path, key, nets, metadata, injected_files, admin_pass)
 
             except Exception as e:
                 # This could be a windows image, or a vmdk format disk
                 LOG.warn(_('instance %(inst_name)s: ignoring error injecting'
                         ' data into image %(img_id)s (%(e)s)') % locals())
-
+        LOG.info(inst.__dict__)
         if FLAGS.libvirt_type == 'lxc':
             disk.setup_container(basepath('disk'),
                                 container_dir=container_dir,

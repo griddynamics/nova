@@ -33,6 +33,7 @@ from nova import log as logging
 from nova import utils
 from nova.virt.injector import GuestFsInjector
 from nova.virt.netcfg import NetConfig
+from crypt import crypt
 
 
 LOG = logging.getLogger('nova.compute.disk')
@@ -99,16 +100,16 @@ def extend(image, size):
     utils.execute('resize2fs', image, check_exit_code=False)
 
 
-def inject_data(image, key=None, nets=None, metadata=None, injected_files=None):
+def inject_data(image, key=None, nets=None, metadata=None, injected_files=None, admin_pass=None):
     """Injects a ssh key and optionally net data into a disk image.
 
     It will use GuestFS to inject files.
     """
     with GuestFsInjector(image) as injector:
-        inject_data_into_fs(injector, key, nets, metadata, injected_files)
+        inject_data_into_fs(injector, key, nets, metadata, injected_files, admin_pass)
 
 
-def inject_data_into_fs(injector, key=None, nets=None, metadata=None, injected_files=None):
+def inject_data_into_fs(injector, key=None, nets=None, metadata=None, injected_files=None, admin_pass=None):
     """Injects data into a root filesystem using injector.
     """
     if injected_files and len(injected_files):
@@ -119,7 +120,8 @@ def inject_data_into_fs(injector, key=None, nets=None, metadata=None, injected_f
         _inject_net_into_fs(nets, injector)
     if metadata:
         _inject_metadata_into_fs(metadata, injector)
-
+    if admin_pass:
+        _inject_passw_into_fs(admin_pass, injector)
 
 def _inject_metadata_into_fs(metadata, injector):
     metadata = dict([(m.key, m.value) for m in metadata])
@@ -138,7 +140,6 @@ def _inject_key_into_fs(key, injector):
     keyfile = os.path.join(sshdir, 'authorized_keys')
     injector.write_append(keyfile, '\n# Injected by Nova key\n' + key.strip() + '\n')
 
-
 def _inject_net_into_fs(nets, injector):
     """Inject /etc/network/interfaces into the filesystem use injector.
 
@@ -149,6 +150,18 @@ def _inject_net_into_fs(nets, injector):
     for cfg_name, content in nc.generate(nets):
         injector.mkdir_p(os.path.dirname(cfg_name))
         injector.write(cfg_name, content)
+
+def _inject_passw_into_fs(password, injector):
+    LOG.debug('Injecting admin password')
+    users = injector.read_lines('/etc/shadow')
+    for i in range(len(users)):
+        if users[i].startswith('root'):
+            user_data = users[i].split(':')
+            user_data[1] = crypt(password)
+            users[i] = ':'.join(user_data)
+            break
+    new_shadow = '\n'.join(users)
+    injector.write('/etc/shadow', new_shadow)
 
 def _inject_files_into_fs(injected_files, injector):
     for name, content in injected_files:

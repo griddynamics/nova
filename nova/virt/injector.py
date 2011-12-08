@@ -185,6 +185,9 @@ class GuestFsInjector:
             old_content = ''
         return self.__gfs.write(path, old_content + content)
 
+    def read_lines(self, path):
+        return self.__gfs.read_lines(path)
+
     def __enter__(self):
         return self
 
