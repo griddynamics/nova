@@ -5,6 +5,7 @@
 %endif
 
 Name:             openstack-nova
+Epoch:            1
 Version:	      2011.3
 Release:	      3
 Summary:          OpenStack Compute (nova)
@@ -53,8 +54,8 @@ BuildRequires:    python-webob
 BuildRequires:    intltool
 
 
-Requires:         python-nova = %{version}-%{release}
-Requires:         %{name}-config >= %{version}
+Requires:         python-nova = %{epoch}:%{version}-%{release}
+Requires:         %{name}-config >= %{epoch}:%{version}
 Requires:         sudo
 Requires:         euca2ools = 1:1.3.1-gd5
 
@@ -80,19 +81,19 @@ toolkit (the same as Python itself) for code and user documentation.
 Summary:          OpenStack Nova full node installation
 Group:            Applications/System
 
-Requires:         %{name} = %{version}-%{release}
-Requires:         %{name}-cc-config >= %{version}
-Requires:         %{name}-api = %{version}-%{release}
-Requires:         %{name}-compute = %{version}-%{release}
-Requires:         %{name}-network = %{version}-%{release}
-Requires:         %{name}-objectstore = %{version}-%{release}
-Requires:         %{name}-scheduler = %{version}-%{release}
-Requires:         %{name}-volume = %{version}-%{release}
-Requires:         openstack-client = %{version}
-Requires:         openstack-glance = %{version}
+Requires:   %{name} = %{epoch}:%{version}-%{release}
+Requires:   %{name}-cc-config >= %{epoch}:%{version}
+Requires:   %{name}-api = %{epoch}:%{version}-%{release}
+Requires:   %{name}-compute = %{epoch}:%{version}-%{release}
+Requires:   %{name}-network = %{epoch}:%{version}-%{release}
+Requires:   %{name}-objectstore = %{epoch}:%{version}-%{release}
+Requires:   %{name}-scheduler = %{epoch}:%{version}-%{release}
+Requires:   %{name}-volume = %{epoch}:%{version}-%{release}
+Requires:         openstack-client = %{epoch}:%{version}
+Requires:         openstack-glance = %{epoch}:%{version}
 #Requires:         openstack-glance-doc = %{version} # shouldn`t have this dep
 %if 0%{?with_doc}
-Requires:         %{name}-doc = %{version}-%{release}
+Requires:   %{name}-doc = %{epoch}:%{version}-%{release}
 %endif
 
 %description      node-full
@@ -103,10 +104,10 @@ configuration.
 Summary:          OpenStack Nova compute node installation
 Group:            Applications/System
 
-Requires:         %{name} = %{version}-%{release}
-Requires:         %{name}-compute-config >= %{version}
-Requires:         %{name}-compute = %{version}-%{release}
-Requires:         %{name}-network = %{version}-%{release}
+Requires:   %{name} = %{epoch}:%{version}-%{release}
+Requires:   %{name}-compute-config >= %{epoch}:%{version}
+Requires:   %{name}-compute = %{epoch}:%{version}-%{release}
+Requires:   %{name}-network = %{epoch}:%{version}-%{release}
 Requires:         MySQL-python
 
 %description      node-compute
@@ -143,7 +144,7 @@ Requires:         python-tornado
 Requires:         python-webob
 Requires:         python-netaddr
 Requires:         python-glance
-Requires:         python-novaclient = %{version}
+Requires:         python-novaclient = %{epoch}:%{version}
 Requires:         python-lxml
 Requires:         python-sqlalchemy-migrate
 Requires:         radvd
@@ -168,7 +169,7 @@ This package contains the %{name} Python library.
 Summary:          A nova API server
 Group:            Applications/System
 
-Requires:         %{name} = %{version}-%{release}
+Requires:   %{name} = %{epoch}:%{version}-%{release}
 Requires:         start-stop-daemon
 
 %description      api
@@ -183,7 +184,7 @@ This package contains the %{name} API Server.
 Summary:          A nova compute server
 Group:            Applications/System
 
-Requires:         %{name} = %{version}-%{release}
+Requires:   %{name} = %{epoch}:%{version}-%{release}
 Requires:         start-stop-daemon
 Requires:         libvirt-python
 Requires:         libvirt >= 0.8.7
@@ -204,7 +205,7 @@ This package contains the %{name} Compute Worker.
 Summary:          A nova network server
 Group:            Applications/System
 
-Requires:         %{name} = %{version}-%{release}
+Requires:   %{name} = %{epoch}:%{version}-%{release}
 Requires:         start-stop-daemon
 
 %description      network
@@ -219,9 +220,9 @@ This package contains the %{name} Network Controller.
 Summary:          A nova vncproxy server
 Group:            Applications/System
 
-Requires:         %{name} = %{version}-%{release}
+Requires:   %{name} = %{epoch}:%{version}-%{release}
 Requires:         start-stop-daemon
-Requires:         openstack-noVNC >= %{version}
+Requires:         openstack-noVNC >= %{epoch}:%{version}
 
 %description      vncproxy
 Nova is a cloud computing fabric controller (the main part of an IaaS system)
@@ -235,7 +236,7 @@ This package contains the %{name} VNC proxy.
 Summary:          A nova objectstore server
 Group:            Applications/System
 
-Requires:         %{name} = %{version}-%{release}
+Requires:   %{name} = %{epoch}:%{version}-%{release}
 Requires:         start-stop-daemon
 
 %description      objectstore
@@ -250,7 +251,7 @@ This package contains the %{name} object store server.
 Summary:          A nova scheduler server
 Group:            Applications/System
 
-Requires:         %{name} = %{version}-%{release}
+Requires:   %{name} = %{epoch}:%{version}-%{release}
 Requires:         start-stop-daemon
 
 %description      scheduler
@@ -265,7 +266,7 @@ This package contains the %{name} Scheduler.
 Summary:          A nova volume server
 Group:            Applications/System
 
-Requires:         %{name} = %{version}-%{release}
+Requires:   %{name} = %{epoch}:%{version}-%{release}
 Requires:         start-stop-daemon
 
 %description      volume
