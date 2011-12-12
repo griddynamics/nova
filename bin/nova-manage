@@ -831,6 +831,11 @@ class NetworkCommands(object):
     def list(self):
         """List all created networks"""
         _fmt = "%-5s\t%-18s\t%-15s\t%-15s\t%-15s\t%-15s\t%-15s\t%-15s\t%-15s"
+        try:
+            networks = db.network_get_all(context.get_admin_context())
+        except exception.NoNetworksFound:
+            print "No networks found"
+            return
         print _fmt % (_('id'),
                           _('IPv4'),
                           _('IPv6'),
@@ -840,7 +845,7 @@ class NetworkCommands(object):
                           _('VlanID'),
                           _('project'),
                           _("uuid"))
-        for network in db.network_get_all(context.get_admin_context()):
+        for network in networks:
             print _fmt % (network.id,
                           network.cidr,
                           network.cidr_v6,

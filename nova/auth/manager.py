@@ -432,7 +432,7 @@ class AuthManager(object):
                                      role,
                                      None)
 
-        if not global_role:
+        if global_role:
             return global_role
 
         if not project or role in FLAGS.global_roles:
