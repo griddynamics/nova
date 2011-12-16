@@ -1,4 +1,5 @@
 #!/bin/bash
+
 #
 # nova-network	OpenStack Nova Network Controller
 #
@@ -16,7 +17,7 @@
 # pidfile: /var/run/nova/nova-network.pid
 
 ### BEGIN INIT INFO
-# Provides: openstack-nova-network
+# Provides: nova-network
 # Required-Start: $local_fs $network $syslog
 # Required-Stop: $local_fs $syslog
 # Should-Start: $syslog
@@ -42,88 +43,77 @@ suffix="network"
 flgfile=/etc/nova/nova.conf
 logfile=/var/log/nova/nova-$suffix.log
 pidfile=/var/run/nova/nova-$suffix.pid
-lckfile=/var/lock/subsys/openstack-nova-$suffix
+lckfile=/var/lock/subsys/nova-$suffix
 binfile=/usr/bin/nova-$suffix
 
 start() {
-	if [ -f "$pidfile" ]; then
-		pid=`cat $pidfile`
-		checkpid $pid
-		r=$?
-		if [ "$r" -eq 0 ]; then
-			cmd=$(basename $binfile)
-			echo -n "$cmd is already running (pid $pid)"; passed
-			echo
-			exit 0
-		fi
-	fi
-	echo -n "Starting $prog: "
-	cd /var/lib/nova
-	/sbin/start-stop-daemon --start -b -c nova:nobody --make-pidfile --pidfile $pidfile  --exec /usr/bin/nova-$suffix -- --flagfile=$flgfile --logfile=$logfile --pidfile $pidfile
-	sleep 1
-	if [ -f "$pidfile" ]; then
-		checkpid `cat $pidfile`
-		r=$?
-		if [ "$r" -eq 0 ]; then
-			touch $lckfile
-			success
-		else
-			failure
-		fi
-	else
-		failure
-	fi
-	echo
-	return
-}	
+    __pids_var_run "$binfile" "$pidfile"
+    retval=$?
+    if [ $retval -eq 0 ]; then
+        cmd=${binfile##*/}
+        echo -n "$cmd is already running (pid $pid)";
+        passed
+        echo
+        return
+    fi
 
-stop() {
-	echo -n "Stopping $prog: "
-	if [ -n "`pidofproc -p $pidfile $binfile`" ] ; then
-		killproc -p $pidfile $binfile
-	else
-		failure $"Stopping $prog"
-	fi
-	retval=$?
-	[ $retval -eq 0 ] && rm -f $lckfile
-	echo
-	return $retval
+    echo -n "Starting $prog: "
+    cd /var/lib/nova
+    /sbin/start-stop-daemon --start -b -c nova:nobody --make-pidfile --pidfile $pidfile --exec $binfile -- --flagfile=$flgfile --logfile=$logfile --pidfile=$pidfile
+    sleep 1
+
+    __pids_var_run "$binfile" "$pidfile"
+    retval=$?
+    if [ $retval -eq 0 ]; then
+        touch $lckfile
+        success
+    else
+        failure
+    fi
+    echo
 }
 
-rh_status() {
-	status -p $pidfile $binfile
+stop() {
+    echo -n "Stopping $prog: "
+    killproc -p $pidfile $binfile
+    retval=$?
+    echo
+    [ $retval -eq 0 ] && rm -f $lckfile $pidfile
 }
 
 restart() {
-    	stop
-	start
+    stop
+    start
 }
 
 case "$1" in
     start)
-	start
-	;;
+        start
+    ;;
     stop)
-	stop
-	;;
+        stop
+    ;;
     status)
-	rh_status
-	retval=$?
-	if [ $retval -eq 3 -a -f $lckfile ] ; then
-		retval=2
-	fi
-	;;
+        status -p $pidfile $binfile
+        retval=$?
+        if [ $retval -eq 3 -a -f $lckfile ]; then
+            retval=2
+        fi
+    ;;
     restart)
-	restart
-	;;
+        restart
+    ;;
+    force-reload)
+        restart
+    ;;
     condrestart)
-	if [ -n "`pidofproc -p $pidfile $binfile`" ] ; then
-		restart
-	fi
-	;;
+        if [ -n "`pidofproc-p$pidfile$binfile`" ]; then
+            restart
+        fi
+    ;;
     *)
-	echo "Usage: service openstack-nova-$suffix {start|stop|status|restart|condrestart}"
-	exit 1
-	;;
+        echo "Usage: service nova-$suffix{start|stop|status|restart|force-reload|condrestart}"
+        exit 1
+    ;;
 esac
-exit $?
+exit $retval

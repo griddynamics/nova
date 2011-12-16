@@ -6,8 +6,8 @@
 
 Name:             openstack-nova
 Epoch:            1
-Version:	      2011.3
-Release:	      3
+Version:          2011.3
+Release:          3
 Summary:          OpenStack Compute (nova)
 
 Group:            Development/Languages
@@ -648,6 +648,9 @@ fi
 %files node-compute
 
 %changelog
+* Fri Dec 16 2011 Boris Filippov <bfilippov@griddynamics.com> - 2011.3
+- Make init scripts LSB conformant
+
 * Tue Aug 29 2011 Alessio Ababilov <aababilov@griddynamics.com> - 2011.3
 - Drop openstack-noVNC dependency
 
