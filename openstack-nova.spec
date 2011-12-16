@@ -1,3 +1,4 @@
+%global prj nova
 %global with_doc 0
 
 %if ! (0%{?fedora} > 12 || 0%{?rhel} > 5)
@@ -19,15 +20,15 @@ Source1:          %{name}-README.rhel6
 Source6:          %{name}.logrotate
 
 # Initscripts
-Source11:         %{name}-api.init
-Source12:         %{name}-compute.init
-Source13:         %{name}-network.init
-Source14:         %{name}-objectstore.init
-Source15:         %{name}-scheduler.init
-Source16:         %{name}-volume.init
-Source17:         %{name}-direct-api.init
-Source18:         %{name}-ajax-console-proxy.init
-Source19:         %{name}-vncproxy.init
+Source11:         %{prj}-api.init
+Source12:         %{prj}-compute.init
+Source13:         %{prj}-network.init
+Source14:         %{prj}-objectstore.init
+Source15:         %{prj}-scheduler.init
+Source16:         %{prj}-volume.init
+Source17:         %{prj}-direct-api.init
+Source18:         %{prj}-ajax-console-proxy.init
+Source19:         %{prj}-vncproxy.init
 
 Source20:         %{name}-sudoers
 Source21:         %{name}-polkit.pkla
@@ -326,15 +327,15 @@ install -d -m 755 %{buildroot}%{_localstatedir}/log/nova
 cp -rp nova/CA %{buildroot}%{_sharedstatedir}/nova
 
 # Install initscripts for Nova services
-install -p -D -m 755 %{SOURCE11} %{buildroot}%{_initrddir}/%{name}-api
-install -p -D -m 755 %{SOURCE12} %{buildroot}%{_initrddir}/%{name}-compute
-install -p -D -m 755 %{SOURCE13} %{buildroot}%{_initrddir}/%{name}-network
-install -p -D -m 755 %{SOURCE14} %{buildroot}%{_initrddir}/%{name}-objectstore
-install -p -D -m 755 %{SOURCE15} %{buildroot}%{_initrddir}/%{name}-scheduler
-install -p -D -m 755 %{SOURCE16} %{buildroot}%{_initrddir}/%{name}-volume
-install -p -D -m 755 %{SOURCE17} %{buildroot}%{_initrddir}/%{name}-direct-api
-install -p -D -m 755 %{SOURCE18} %{buildroot}%{_initrddir}/%{name}-ajax-console-proxy
-install -p -D -m 755 %{SOURCE19} %{buildroot}%{_initrddir}/%{name}-vncproxy
+install -p -D -m 755 %{SOURCE11} %{buildroot}%{_initrddir}/%{prj}-api
+install -p -D -m 755 %{SOURCE12} %{buildroot}%{_initrddir}/%{prj}-compute
+install -p -D -m 755 %{SOURCE13} %{buildroot}%{_initrddir}/%{prj}-network
+install -p -D -m 755 %{SOURCE14} %{buildroot}%{_initrddir}/%{prj}-objectstore
+install -p -D -m 755 %{SOURCE15} %{buildroot}%{_initrddir}/%{prj}-scheduler
+install -p -D -m 755 %{SOURCE16} %{buildroot}%{_initrddir}/%{prj}-volume
+install -p -D -m 755 %{SOURCE17} %{buildroot}%{_initrddir}/%{prj}-direct-api
+install -p -D -m 755 %{SOURCE18} %{buildroot}%{_initrddir}/%{prj}-ajax-console-proxy
+install -p -D -m 755 %{SOURCE19} %{buildroot}%{_initrddir}/%{prj}-vncproxy
 
 # Install sudoers
 install -p -D -m 440 %{SOURCE20} %{buildroot}%{_sysconfdir}/sudoers.d/%{name}
@@ -411,149 +412,94 @@ if rpmquery openstack-nova-cc-config 1>&2 >/dev/null; then
 		echo "New installation"
 		echo "Please refer http://wiki.openstack.org/NovaInstall/RHEL6Notes for instructions"
 	fi
-
-	upgrade_db=0
-	if   nova_option 'sql_connection' 'mysql://'; then
-		# Assuming that we have MySQL server on the same node with Cloud Controller
-		echo "Nova database: MySQL"
-		service mysqld status 2>&1 >/dev/null
-		if [ "$?" = 0 ]; then
-			upgrade_db=1
-		else
-			echo "mysqld is not running, skipping Nova db sync"
-		fi
-	elif nova_option 'sql_connection' 'sqlite://'; then
-		echo "Nova database: SQLite"
-		upgrage_db=1
-	else
-		echo "Nova database: UNSUPPORTED by this RPM postscript"
-		echo "Please ensure that it's running and migrate db"	
-	fi
-
-	if [ "$upgrade_db" -eq "1" ]; then
-		echo "Performing Nova database upgrade:"
-		%{_bindir}/nova-manage db sync
-	fi
 fi
 
 # api
 
-%post api
-/sbin/chkconfig --add %{name}-api
-/sbin/chkconfig --add %{name}-direct-api
-
 %preun api
 if [ $1 -eq 0 ] ; then
-    /sbin/service %{name}-api stop >/dev/null 2>&1
-    /sbin/service %{name}-direct-api stop >/dev/null 2>&1
-    /sbin/chkconfig --del %{name}-api
-    /sbin/chkconfig --del %{name}-direct-api
+    /sbin/service %{prj}-api stop >/dev/null 2>&1
+    /sbin/service %{prj}-direct-api stop >/dev/null 2>&1
 fi
 
 %postun api
 if [ $1 -eq 1 ] ; then
-    /sbin/service %{name}-api condrestart
-    /sbin/service %{name}-direct-api condrestart
+    /sbin/service %{prj}-api condrestart
+    /sbin/service %{prj}-direct-api condrestart
 fi
 
 # compute
 
-%post compute
-/sbin/chkconfig --add %{name}-ajax-console-proxy
-/sbin/chkconfig --add %{name}-compute
-
 %preun compute
 if [ $1 -eq 0 ] ; then
-    /sbin/service %{name}-ajax-console-proxy stop >/dev/null 2>&1
-    /sbin/service %{name}-compute stop >/dev/null 2>&1
-    /sbin/chkconfig --del %{name}-ajax-console-proxy
-    /sbin/chkconfig --del %{name}-compute
+    /sbin/service %{prj}-ajax-console-proxy stop >/dev/null 2>&1
+    /sbin/service %{prj}-compute stop >/dev/null 2>&1
 fi
 
 %postun compute
 if [ $1 -eq 1 ] ; then
-    /sbin/service %{name}-ajax-console-proxy condrestart
-    /sbin/service %{name}-compute condrestart
+    /sbin/service %{prj}-ajax-console-proxy condrestart
+    /sbin/service %{prj}-compute condrestart
 fi
 
 # network
 
-%post network
-/sbin/chkconfig --add %{name}-network
-
 %preun network
 if [ $1 -eq 0 ] ; then
-    /sbin/service %{name}-network stop >/dev/null 2>&1
-    /sbin/chkconfig --del %{name}-network
+    /sbin/service %{prj}-network stop >/dev/null 2>&1
 fi
 
 %postun network
 if [ $1 -eq 1 ] ; then
-    /sbin/service %{name}-network condrestart
+    /sbin/service %{prj}-network condrestart
 fi
 
 # vncproxy
 
-%post vncproxy
-/sbin/chkconfig --add %{name}-vncproxy
-
 %preun vncproxy
 if [ $1 -eq 0 ] ; then
-    /sbin/service %{name}-vncproxy stop >/dev/null 2>&1
-    /sbin/chkconfig --del %{name}-vncproxy
+    /sbin/service %{prj}-vncproxy stop >/dev/null 2>&1
 fi
 
 %postun vncproxy
 if [ $1 -eq 1 ] ; then
-    /sbin/service %{name}-vncproxy condrestart
+    /sbin/service %{prj}-vncproxy condrestart
 fi
 
 # objectstore
 
-%post objectstore
-/sbin/chkconfig --add %{name}-objectstore
-
 %preun objectstore
 if [ $1 -eq 0 ] ; then
-    /sbin/service %{name}-objectstore stop >/dev/null 2>&1
-    /sbin/chkconfig --del %{name}-objectstore
+    /sbin/service %{prj}-objectstore stop >/dev/null 2>&1
 fi
 
 %postun objectstore
 if [ $1 -eq 1 ] ; then
-    /sbin/service %{name}-objectstore condrestart
+    /sbin/service %{prj}-objectstore condrestart
 fi
 
 # scheduler
 
-%post scheduler
-/sbin/chkconfig --add %{name}-scheduler
-
 %preun scheduler
 if [ $1 -eq 0 ] ; then
-    /sbin/service %{name}-scheduler stop >/dev/null 2>&1
-    /sbin/chkconfig --del %{name}-scheduler
+    /sbin/service %{prj}-scheduler stop >/dev/null 2>&1
 fi
 
 %postun scheduler
 if [ $1 -eq 1 ] ; then
-    /sbin/service %{name}-scheduler condrestart
+    /sbin/service %{prj}-scheduler condrestart
 fi
 
 # volume
 
-%post volume
-/sbin/chkconfig --add %{name}-volume
-
 %preun volume
 if [ $1 -eq 0 ] ; then
-    /sbin/service %{name}-volume stop >/dev/null 2>&1
-    /sbin/chkconfig --del %{name}-volume
+    /sbin/service %{prj}-volume stop >/dev/null 2>&1
 fi
 
 %postun volume
 if [ $1 -eq 1 ] ; then
-    /sbin/service %{name}-volume condrestart
+    /sbin/service %{prj}-volume condrestart
 fi
 
 %files
@@ -585,7 +531,7 @@ fi
 %files vncproxy
 %defattr(-,root,root,-)
 %{_bindir}/nova-vncproxy
-%{_initrddir}/%{name}-vncproxy
+%{_initrddir}/%{prj}-vncproxy
 #%doc %{_sharedstatedir}/nova/noVNC/LICENSE.txt
 #%doc %{_sharedstatedir}/nova/noVNC/README.md
 
@@ -597,8 +543,8 @@ fi
 
 %files api
 %defattr(-,root,root,-)
-%{_initrddir}/%{name}-api
-%{_initrddir}/%{name}-direct-api
+%{_initrddir}/%{prj}-api
+%{_initrddir}/%{prj}-direct-api
 %{_bindir}/nova-api
 %{_bindir}/nova-api-ec2
 %{_bindir}/nova-api-os
@@ -612,30 +558,30 @@ fi
 %{_bindir}/euca-get-ajax-console
 %{_bindir}/nova-ajax-console-proxy
 %{_bindir}/nova-compute
-%{_initrddir}/%{name}-compute
-%{_initrddir}/%{name}-ajax-console-proxy
+%{_initrddir}/%{prj}-compute
+%{_initrddir}/%{prj}-ajax-console-proxy
 %{_datarootdir}/nova/ajaxterm
 
 %files network
 %defattr(-,root,root,-)
 %{_bindir}/nova-network
 %{_bindir}/nova-dhcpbridge
-%{_initrddir}/%{name}-network
+%{_initrddir}/%{prj}-network
 
 %files objectstore
 %defattr(-,root,root,-)
 %{_bindir}/nova-objectstore
-%{_initrddir}/%{name}-objectstore
+%{_initrddir}/%{prj}-objectstore
 
 %files scheduler
 %defattr(-,root,root,-)
 %{_bindir}/nova-scheduler
-%{_initrddir}/%{name}-scheduler
+%{_initrddir}/%{prj}-scheduler
 
 %files volume
 %defattr(-,root,root,-)
 %{_bindir}/nova-volume
-%{_initrddir}/%{name}-volume
+%{_initrddir}/%{prj}-volume
 
 %if 0%{?with_doc}
 %files doc
@@ -650,6 +596,9 @@ fi
 %changelog
 * Fri Dec 16 2011 Boris Filippov <bfilippov@griddynamics.com> - 2011.3
 - Make init scripts LSB conformant
+- Rename init scripts
+- Disable services autorun
+- Disable db sync during install
 
 * Tue Aug 29 2011 Alessio Ababilov <aababilov@griddynamics.com> - 2011.3
 - Drop openstack-noVNC dependency
