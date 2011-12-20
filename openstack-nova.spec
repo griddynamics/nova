@@ -33,6 +33,7 @@ Source19:         %{prj}-vncproxy.init
 Source20:         %{name}-sudoers
 Source21:         %{name}-polkit.pkla
 Source22:         %{name}-rhel-ifc-template
+Source23:         %{prj}.conf
 
 BuildRoot:        %{_tmppath}/nova-%{version}-%{release}-root-%(%{__id_u} -n)
 
@@ -56,9 +57,7 @@ BuildRequires:    intltool
 
 
 Requires:         python-nova = %{epoch}:%{version}-%{release}
-Requires:         %{name}-config >= %{epoch}:%{version}
 Requires:         sudo
-Requires:         euca2ools = 1:1.3.1-gd5
 
 Requires(post):   chkconfig grep sudo libselinux-utils
 Requires(postun): initscripts
@@ -66,6 +65,8 @@ Requires(preun):  chkconfig
 Requires(pre):    shadow-utils qemu-kvm
 
 Obsoletes:        %{name}-instancemonitor
+Obsoletes:        %{name}-nova-cc-config
+Obsoletes:        %{name}-compute-config
 
 %description
 Nova is a cloud computing fabric controller (the main part of an IaaS system)
@@ -83,15 +84,14 @@ Summary:          OpenStack Nova full node installation
 Group:            Applications/System
 
 Requires:   %{name} = %{epoch}:%{version}-%{release}
-Requires:   %{name}-cc-config >= %{epoch}:%{version}
 Requires:   %{name}-api = %{epoch}:%{version}-%{release}
 Requires:   %{name}-compute = %{epoch}:%{version}-%{release}
 Requires:   %{name}-network = %{epoch}:%{version}-%{release}
 Requires:   %{name}-objectstore = %{epoch}:%{version}-%{release}
 Requires:   %{name}-scheduler = %{epoch}:%{version}-%{release}
 Requires:   %{name}-volume = %{epoch}:%{version}-%{release}
-Requires:         openstack-client = %{epoch}:%{version}
-Requires:         openstack-glance = %{epoch}:%{version}
+Requires:   openstack-client = %{epoch}:%{version}
+Requires:   openstack-glance = %{epoch}:%{version}
 #Requires:         openstack-glance-doc = %{version} # shouldn`t have this dep
 %if 0%{?with_doc}
 Requires:   %{name}-doc = %{epoch}:%{version}-%{release}
@@ -106,7 +106,6 @@ Summary:          OpenStack Nova compute node installation
 Group:            Applications/System
 
 Requires:   %{name} = %{epoch}:%{version}-%{release}
-Requires:   %{name}-compute-config >= %{epoch}:%{version}
 Requires:   %{name}-compute = %{epoch}:%{version}-%{release}
 Requires:   %{name}-network = %{epoch}:%{version}-%{release}
 Requires:         MySQL-python
@@ -317,6 +316,7 @@ rm -fr doc/build/html/.doctrees doc/build/html/.buildinfo
 %endif
 
 # Setup directories
+install -d -m 755 %{buildroot}%{_sysconfdir}/nova
 install -d -m 755 %{buildroot}%{_sharedstatedir}/nova
 install -d -m 755 %{buildroot}%{_sharedstatedir}/nova/images
 install -d -m 755 %{buildroot}%{_sharedstatedir}/nova/instances
@@ -351,10 +351,13 @@ install -p -D -m 644 nova/auth/novarc.template %{buildroot}%{_datarootdir}/nova/
 install -p -D -m 644 nova/cloudpipe/client.ovpn.template %{buildroot}%{_datarootdir}/nova/client.ovpn.template
 install -p -D -m 644 nova/virt/libvirt.xml.template %{buildroot}%{_datarootdir}/nova/libvirt.xml.template
 
+#install nova.conf
+install -p -D -m 600 %{SOURCE23} %{buildroot}%{_sysconfdir}/nova/nova.conf
+
 # Network configuration templates for injection engine
 install -d -m 755 %{buildroot}%{_datarootdir}/nova/interfaces
 #install -p -D -m 644 nova/virt/interfaces.template %{buildroot}%{_datarootdir}/nova/interfaces/interfaces.ubuntu.template
-install -p -D -m 644 %{SOURCE22}                   %{buildroot}%{_datarootdir}/nova/interfaces/interfaces.rhel.template
+install -p -D -m 644 %{SOURCE22} %{buildroot}%{_datarootdir}/nova/interfaces/interfaces.rhel.template
 
 # Clean CA directory
 find %{buildroot}%{_sharedstatedir}/nova/CA -name .gitignore -delete
@@ -384,11 +387,6 @@ exit 0
 
 %post -p /bin/bash
 
-nova_option () {
-	grep "$1" %{_sysconfdir}/nova/nova.conf | cut -d= -f2 | grep "$2" >/dev/null
-	return $?
-}
-
 if ! fgrep '#includedir /etc/sudoers.d' /etc/sudoers 2>&1 >/dev/null; then
         echo '#includedir /etc/sudoers.d' >> /etc/sudoers
 fi
@@ -402,16 +400,6 @@ if %{_sbindir}/selinuxenabled; then
 	echo -e "\033[47m\033[1;31m*\033[0m \033[40m\033[1;31mto reboot your host to apply that change!       \033[47m\033[1;31m*\033[0m"
 	echo -e "\033[47m\033[1;31m*\033[0m \033[40m\033[1;31m                                                \033[47m\033[1;31m*\033[0m"
 	echo -e "\033[47m\033[1;31m***************************************************\033[0m"
-fi
-
-if rpmquery openstack-nova-cc-config 1>&2 >/dev/null; then
-	# Cloud controller node detected, assuming that is contains database
-	
-	# Database init/migration
-	if [ $1 -lt 2 ]; then
-		echo "New installation"
-		echo "Please refer http://wiki.openstack.org/NovaInstall/RHEL6Notes for instructions"
-	fi
 fi
 
 # api
@@ -507,6 +495,7 @@ fi
 %doc README README.rhel6
 %config(noreplace) %{_sysconfdir}/logrotate.d/%{name}
 %config(noreplace) %{_sysconfdir}/sudoers.d/%{name}
+%config(noreplace) %{_sysconfdir}/nova/nova.conf
 %dir %attr(0755, nova, root) %{_localstatedir}/log/nova
 %dir %attr(0755, nova, root) %{_localstatedir}/run/nova
 %{_bindir}/instance-usage-audit
@@ -551,6 +540,7 @@ fi
 %{_bindir}/nova-direct-api
 %defattr(-,nova,nobody,-)
 %config(noreplace) %{_sysconfdir}/nova/api-paste.ini
+%config(noreplace) %{_sysconfdir}/nova/nova.conf
 
 %files compute
 %defattr(-,root,root,-)
@@ -594,6 +584,10 @@ fi
 %files node-compute
 
 %changelog
+* Fri Dec 20 2011 Boris Filippov <bfilippov@griddynamics.com> - 2011.3
+- Obsolete nova-cc-config
+- Add nova.conf to compute package 
+
 * Fri Dec 16 2011 Boris Filippov <bfilippov@griddynamics.com> - 2011.3
 - Make init scripts LSB conformant
 - Rename init scripts

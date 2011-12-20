@@ -4,4 +4,6 @@ copy: redhat/openstack-nova-sudoers
 copy: redhat/openstack-nova-polkit.pkla
 copy: redhat/openstack-nova-README.rhel6
 copy: redhat/openstack-nova.logrotate
+copy: etc/nova/nova.conf
+copy: etc/nova/api-paste.ini
 tar.gz: . name=nova-@version@ base=nova-@version@
