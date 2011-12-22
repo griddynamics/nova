@@ -793,6 +793,24 @@ class LibvirtConnection(driver.ComputeDriver):
         if size:
             disk.extend(target, size)
 
+    def _check_image_size(self, imagepath, allowed_size_bytes):
+        size_bytes = os.path.getsize(imagepath)
+
+        LOG.debug(_("image_size_bytes=%(size_bytes)d, allowed_size_bytes="
+                    "%(allowed_size_bytes)d") % locals())
+
+        if size_bytes > allowed_size_bytes:
+            LOG.info(_("Image size %(size_bytes)d exceeded"
+                       " instance_type allowed size "
+                       "%(allowed_size_bytes)d")
+                       % locals())
+            raise exception.ImageTooLarge()
+
+    def _fetch_image_and_check_size(self,
+            context, target, image_id, user_id, project_id, size):
+        images.fetch_to_raw(context, image_id, target, user_id, project_id)
+        self._check_image_size(target, size)
+
     def _create_local(self, target, local_size, unit='G', fs_format=None):
         """Create a blank image of specified size"""
 
@@ -867,38 +885,43 @@ class LibvirtConnection(driver.ComputeDriver):
                                   project_id=inst['project_id'])
 
         root_fname = hashlib.sha1(disk_images['image_id']).hexdigest()
-        size = FLAGS.minimum_root_size
 
         inst_type_id = inst['instance_type_id']
         inst_type = instance_types.get_instance_type(inst_type_id)
-        if inst_type['name'] == 'm1.tiny' or suffix == '.rescue':
-            size = None
-            root_fname += "_sm"
+        #if inst_type['name'] == 'm1.tiny' or suffix == '.rescue':
+        #    size = None
+        #    root_fname += "_sm"
 
         if not self._volume_in_mapping(self.default_root_device,
                                        block_device_info):
-            self._cache_image(fn=self._fetch_image,
+            target = basepath('disk')
+            size = inst['local_gb'] * 2 ** 30
+            base = os.path.join(FLAGS.instances_path, '_base', root_fname)
+            if os.path.exists(base):
+                self._check_image_size(base, size)
+            self._cache_image(fn=self._fetch_image_and_check_size,
                               context=context,
-                              target=basepath('disk'),
+                              target=target,
                               fname=root_fname,
-                              cow=FLAGS.use_cow_images,
+                              cow=False,
                               image_id=disk_images['image_id'],
                               user_id=inst['user_id'],
                               project_id=inst['project_id'],
                               size=size)
+            disk.extend(target, size)
 
-        local_gb = inst['local_gb']
-        if local_gb and not self._volume_in_mapping(
-            self.default_local_device, block_device_info):
-            fn = functools.partial(self._create_ephemeral,
-                                   fs_label='ephemeral0',
-                                   os_type=inst.os_type)
-            self._cache_image(fn=fn,
-                              target=basepath('disk.local'),
-                              fname="ephemeral_%s_%s_%s" %
-                              ("0", local_gb, inst.os_type),
-                              cow=FLAGS.use_cow_images,
-                              local_size=local_gb)
+#        local_gb = inst['local_gb']
+#        if local_gb and not self._volume_in_mapping(
+#            self.default_local_device, block_device_info):
+#            fn = functools.partial(self._create_ephemeral,
+#                                   fs_label='ephemeral0',
+#                                   os_type=inst.os_type)
+#            self._cache_image(fn=fn,
+#                              target=basepath('disk.local'),
+#                              fname="ephemeral_%s_%s_%s" %
+#                              ("0", local_gb, inst.os_type),
+#                              cow=FLAGS.use_cow_images,
+#                              local_size=local_gb)
 
         for eph in driver.block_device_info_get_ephemerals(block_device_info):
             fn = functools.partial(self._create_ephemeral,
@@ -1092,13 +1115,14 @@ class LibvirtConnection(driver.ComputeDriver):
                                            block_device_info)
 
         local_device = False
-        if not (self._volume_in_mapping(self.default_local_device,
-                                        block_device_info) or
-                0 in [eph['num'] for eph in
-                      driver.block_device_info_get_ephemerals(
-                          block_device_info)]):
-            if instance['local_gb'] > 0:
-                local_device = self.default_local_device
+# NOTE(alessio): do not support local_device by default
+#        if not (self._volume_in_mapping(self.default_local_device,
+#                                        block_device_info) or
+#                0 in [eph['num'] for eph in
+#                      driver.block_device_info_get_ephemerals(
+#                          block_device_info)]):
+#            if instance['local_gb'] > 0:
+#                local_device = self.default_local_device
 
         ephemerals = []
         for eph in driver.block_device_info_get_ephemerals(block_device_info):
