@@ -132,7 +132,7 @@ class GuestFsInjector:
 
     def get_os_type(self):
         if self.__os_type is None:
-            self.__os_type = g.inspect_get_distro(self.__root)
+            self.__os_type = self.__gfs.inspect_get_distro(self.__root)
         return self.__os_type
 
     def __find_root(self):

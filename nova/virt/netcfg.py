@@ -81,6 +81,9 @@ IPV6ADDR={address_v6}
     def generate(self, nets):
         for net in nets:
             cfg = [self.__header, self.__iface4.format(**net)]
+            dnslist=net['dns'].split()
+            for idx in range(len(dnslist)):
+                cfg.append('DNS{0}={1}\n'.format(idx+1, dnslist[idx]))
             if FLAGS.use_ipv6:
                 cfg.append(self.__iface6.format(**net))
             yield ('/etc/sysconfig/network-scripts/ifcfg-{0}'.format(net['name']), ''.join(cfg))
