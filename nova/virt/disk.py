@@ -123,10 +123,12 @@ def inject_data_into_fs(injector, key=None, nets=None, metadata=None, injected_f
     if admin_pass:
         _inject_passw_into_fs(admin_pass, injector)
 
+
 def _inject_metadata_into_fs(metadata, injector):
     metadata = dict([(m.key, m.value) for m in metadata])
     metadata_str = json.dumps(metadata)
     injector.write('meta.js', metadata_str)
+
 
 def _inject_key_into_fs(key, injector):
     """Add the given public ssh key to root's authorized_keys.
@@ -138,7 +140,9 @@ def _inject_key_into_fs(key, injector):
     injector.mkdir_p(sshdir)
     injector.chmod(sshdir, 0o700)
     keyfile = os.path.join(sshdir, 'authorized_keys')
-    injector.write_append(keyfile, '\n# Injected by Nova key\n' + key.strip() + '\n')
+    injector.write_append(keyfile,
+        '\n# Injected by Nova key\n' + key.strip() + '\n')
+
 
 def _inject_net_into_fs(nets, injector):
     """Inject /etc/network/interfaces into the filesystem use injector.
@@ -151,6 +155,7 @@ def _inject_net_into_fs(nets, injector):
         injector.mkdir_p(os.path.dirname(cfg_name))
         injector.write(cfg_name, content)
 
+
 def _inject_passw_into_fs(password, injector):
     LOG.debug('Injecting admin password')
     users = injector.read_lines('/etc/shadow')
@@ -162,6 +167,7 @@ def _inject_passw_into_fs(password, injector):
             break
     new_shadow = '\n'.join(users)
     injector.write('/etc/shadow', new_shadow)
+
 
 def _inject_files_into_fs(injected_files, injector):
     for name, content in injected_files:

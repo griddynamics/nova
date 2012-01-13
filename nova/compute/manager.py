@@ -406,14 +406,15 @@ class ComputeManager(manager.SchedulerDependentManager):
                     _deallocate_network()
 
         @contextlib.contextmanager
-        def _logging_error(instance_id, message):
+        def _logging_error(instance_id, message, cleanup=None):
             try:
                 yield
             except Exception as error:
                 with utils.save_and_reraise_exception():
                     LOG.exception(_("Instance '%(instance_id)s' "
                                    "failed %(message)s.") % locals())
-
+                if cleanup:
+                    cleanup()
         context = context.elevated()
         instance = self.db.instance_get(context, instance_id)
 
@@ -454,7 +455,7 @@ class ComputeManager(manager.SchedulerDependentManager):
                                   task_state=task_states.SPAWNING)
 
             # TODO(vish) check to make sure the availability zone matches
-            with _logging_error(instance_id, "failed to spawn"):
+            with _logging_error(instance_id, "failed to spawn", cleanup=_deallocate_network):
                 self.driver.spawn(context, instance,
                                   network_info, block_device_info)
 
@@ -653,7 +654,8 @@ class ComputeManager(manager.SchedulerDependentManager):
     @exception.wrap_exception(notifier=notifier, publisher_id=publisher_id())
     def snapshot_instance(self, context, instance_id, image_id,
                           image_type='snapshot', backup_type=None,
-                          rotation=None):
+                          rotation=None,
+                          force_snapshot=False):
         """Snapshot an instance on this host.
 
         :param context: security context
@@ -663,6 +665,8 @@ class ComputeManager(manager.SchedulerDependentManager):
         :param backup_type: daily | weekly
         :param rotation: int representing how many backups to keep around;
             None if rotation shouldn't be used (as in the case of snapshots)
+        :param force_snapshot: try to perform snapshot on running instance
+            even if that can lead to unexpected errors
         """
         if image_type == "snapshot":
             task_state = task_states.IMAGE_SNAPSHOT
@@ -692,8 +696,8 @@ class ComputeManager(manager.SchedulerDependentManager):
                        'expected: %(running)s)') % locals())
 
         try:
-            self.driver.snapshot(context, instance_ref, image_id)
-        finally:
+            self.driver.snapshot(context, instance_ref, image_id, force_snapshot)
+        finally:        
             self._instance_update(context, instance_id, task_state=None)
 
         if image_type == 'snapshot' and rotation:
