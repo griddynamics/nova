@@ -90,9 +90,7 @@ Requires:   %{name}-network = %{epoch}:%{version}-%{release}
 Requires:   %{name}-objectstore = %{epoch}:%{version}-%{release}
 Requires:   %{name}-scheduler = %{epoch}:%{version}-%{release}
 Requires:   %{name}-volume = %{epoch}:%{version}-%{release}
-Requires:   openstack-client = %{epoch}:%{version}
-Requires:   openstack-glance = %{epoch}:%{version}
-#Requires:         openstack-glance-doc = %{version} # shouldn`t have this dep
+Requires:   openstack-glance
 %if 0%{?with_doc}
 Requires:   %{name}-doc = %{epoch}:%{version}-%{release}
 %endif
@@ -144,7 +142,7 @@ Requires:         python-tornado
 Requires:         python-webob
 Requires:         python-netaddr
 Requires:         python-glance
-Requires:         python-novaclient = %{epoch}:%{version}
+Requires:         python-novaclient
 Requires:         python-lxml
 Requires:         python-sqlalchemy-migrate
 Requires:         radvd
@@ -584,6 +582,9 @@ fi
 %files node-compute
 
 %changelog
+* Fri Jan 13 2012 Alessio Ababilov <aababilov@griddynamics.com> - 2011.3
+- No version checking for python-novaclient and openstack-glance
+
 * Fri Dec 20 2011 Boris Filippov <bfilippov@griddynamics.com> - 2011.3
 - Obsolete nova-cc-config
 - Add nova.conf to compute package 
