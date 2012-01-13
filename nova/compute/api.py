@@ -1026,20 +1026,24 @@ class API(base.Base):
         return recv_meta
 
     @scheduler_api.reroute_compute("snapshot")
-    def snapshot(self, context, instance_id, name, extra_properties=None):
+    def snapshot(self, context, instance_id, name, extra_properties=None,
+                 extra_options=None):
         """Snapshot the given instance.
 
         :param instance_id: nova.db.sqlalchemy.models.Instance.Id
         :param name: name of the backup or snapshot
         :param extra_properties: dict of extra image properties to include
+        :param extra_options: dict of extra options
 
         :returns: A dict containing image metadata
         """
         return self._create_image(context, instance_id, name, 'snapshot',
-                                  extra_properties=extra_properties)
+                                  extra_properties=extra_properties,
+                                  extra_options=extra_options)
 
     def _create_image(self, context, instance_id, name, image_type,
-                      backup_type=None, rotation=None, extra_properties=None):
+                      backup_type=None, rotation=None,
+                      extra_properties=None, extra_options=None):
         """Create snapshot or backup for an instance on this host.
 
         :param context: security context
@@ -1050,7 +1054,7 @@ class API(base.Base):
         :param rotation: int representing how many backups to keep around;
             None if rotation shouldn't be used (as in the case of snapshots)
         :param extra_properties: dict of extra image properties to include
-
+        :param extra_options: dict of extra options
         """
         instance = self.db.instance_get(context, instance_id)
         task_state = instance["task_state"]
@@ -1072,6 +1076,8 @@ class API(base.Base):
         recv_meta = self.image_service.create(context, sent_meta)
         params = {'image_id': recv_meta['id'], 'image_type': image_type,
                   'backup_type': backup_type, 'rotation': rotation}
+        if extra_options:
+            params.update(extra_options)
         self._cast_compute_message('snapshot_instance', context, instance_id,
                                    params=params)
         return recv_meta

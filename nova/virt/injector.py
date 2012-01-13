@@ -22,8 +22,10 @@ from functools import wraps
 
 from nova import utils
 
+
 def _abs_path(method):
-    """Decorator that used to wrap FileInjector methods which accept path as first argument"""
+    """Decorator that used to wrap FileInjector methods
+    which accept path as first argument"""
     @wraps(method)
     def wrapper(obj, path, *args, **kwargs):
         return method(obj, obj.abs_path(path), *args, **kwargs)
@@ -73,7 +75,8 @@ class FileInjector:
 
         mode should be integer.
         """
-        utils.execute(('chmod', '{0:o}'.format(mode), path), check_exit_code=True, run_as_root=True)
+        utils.execute(('chmod', '{0:o}'.format(mode), path),
+            check_exit_code=True, run_as_root=True)
 
     @_abs_path
     def chown(self, path, uid=None, gid=None):
@@ -86,7 +89,8 @@ class FileInjector:
             param = uid
         else:
             param = uid + ':' + gid
-        utils.execute(('chown', param, path), check_exit_code=True, run_as_root=True)
+        utils.execute(('chown', param, path),
+            check_exit_code=True, run_as_root=True)
 
     @_abs_path
     def write(self, path, content):
@@ -95,8 +99,10 @@ class FileInjector:
 
     @_abs_path
     def write_append(self, path, content):
-        """Append content to the file. If file is not exists then create it first."""
-        utils.execute('tee', '-a', path, process_input=content, run_as_root=True)
+        """Append content to the file.
+        If file is not exists then create it first."""
+        utils.execute('tee', '-a', path,
+            process_input=content, run_as_root=True)
 
     def __enter__(self):
         return self

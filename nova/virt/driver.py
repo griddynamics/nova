@@ -232,7 +232,7 @@ class ComputeDriver(object):
         # TODO(Vek): Need to pass context in for access to auth_token
         raise NotImplementedError()
 
-    def snapshot(self, context, instance, image_id):
+    def snapshot(self, context, instance, image_id, force_live_snapshot):
         """
         Snapshots the specified instance.
 
@@ -240,6 +240,7 @@ class ComputeDriver(object):
         :param instance: Instance object as returned by DB layer.
         :param image_id: Reference to a pre-created image that will
                          hold the snapshot.
+        :param force_live_snapshot: always try perform snapshot on running instance
         """
         raise NotImplementedError()
 

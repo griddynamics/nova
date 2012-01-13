@@ -67,23 +67,23 @@
         </disk>
     #else
         #if not ($getVar('ebs_root', False))
-        <disk type='file'>
-            <driver type='${driver_type}'/>
-            <source file='${basepath}/disk'/>
-            <target dev='${root_device}' bus='${disk_bus}'/>
-        </disk>
+            <disk type='${device_type}'>
+                <driver type='${driver_type}'/>
+                <source ${source_type}='${disk}'/>
+                <target dev='${root_device}' bus='${disk_bus}'/>
+            </disk>
         #end if
         #if $getVar('local_device', False)
-            <disk type='file'>
-                <driver type='${driver_type}'/>
-                <source file='${basepath}/disk.local'/>
+            <disk type='${local_device_info.device_type}'>
+                <driver type='${local_device_info.driver_type}'/>
+                <source ${local_device_info.source_type}='${local_device_info.disk}'/>
                 <target dev='${local_device}' bus='${disk_bus}'/>
             </disk>
         #end if
 	#for $eph in $ephemerals
-	     <disk type='block'>
-                <driver type='${driver_type}'/>
-                <source dev='${basepath}/${eph.device_path}'/>
+	     <disk type='${eph.device_type}'>
+                <driver type='${eph.driver_type}'/>
+                <source ${eph.source_type}='${eph.disk}'/>
                 <target dev='${eph.device}' bus='${disk_bus}'/>
 	     </disk>
 	#end for

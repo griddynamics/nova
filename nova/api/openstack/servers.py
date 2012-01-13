@@ -778,6 +778,7 @@ class ControllerV11(Controller):
 
         try:
             image_name = entity["name"]
+            force_snapshot = entity.get("force_snapshot", False)
 
         except KeyError:
             msg = _("createImage entity requires name attribute")
@@ -803,10 +804,14 @@ class ControllerV11(Controller):
             raise webob.exc.HTTPBadRequest(explanation=msg)
 
         try:
+            extra_options = {
+                'force_snapshot' : force_snapshot
+            }
             image = self.compute_api.snapshot(context,
                                               instance_id,
                                               image_name,
-                                              extra_properties=props)
+                                              extra_properties=props,
+                                              extra_options=extra_options)
         except exception.InstanceBusy:
             msg = _("Server is currently creating an image. Please wait.")
             raise webob.exc.HTTPConflict(explanation=msg)

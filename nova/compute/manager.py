@@ -640,7 +640,8 @@ class ComputeManager(manager.SchedulerDependentManager):
     @exception.wrap_exception(notifier=notifier, publisher_id=publisher_id())
     def snapshot_instance(self, context, instance_id, image_id,
                           image_type='snapshot', backup_type=None,
-                          rotation=None):
+                          rotation=None,
+                          force_snapshot=False):
         """Snapshot an instance on this host.
 
         :param context: security context
@@ -650,6 +651,8 @@ class ComputeManager(manager.SchedulerDependentManager):
         :param backup_type: daily | weekly
         :param rotation: int representing how many backups to keep around;
             None if rotation shouldn't be used (as in the case of snapshots)
+        :param force_snapshot: try to perform snapshot on running instance
+            even if that can lead to unexpected errors
         """
         if image_type == "snapshot":
             task_state = task_states.IMAGE_SNAPSHOT
@@ -678,7 +681,7 @@ class ComputeManager(manager.SchedulerDependentManager):
                        'instance: %(instance_id)s (state: %(state)s '
                        'expected: %(running)s)') % locals())
 
-        self.driver.snapshot(context, instance_ref, image_id)
+        self.driver.snapshot(context, instance_ref, image_id, force_snapshot)
         self._instance_update(context, instance_id, task_state=None)
 
         if image_type == 'snapshot' and rotation:
