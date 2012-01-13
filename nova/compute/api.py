@@ -22,6 +22,7 @@
 import novaclient
 import re
 import time
+import threading
 
 from nova import block_device
 from nova import exception
@@ -41,6 +42,7 @@ from nova.compute.utils import terminate_volumes
 from nova.scheduler import api as scheduler_api
 from nova.db import base
 
+from webob import exc
 
 LOG = logging.getLogger('nova.compute.api')
 
@@ -49,6 +51,7 @@ FLAGS = flags.FLAGS
 flags.DECLARE('vncproxy_topic', 'nova.vnc')
 flags.DEFINE_integer('find_host_timeout', 30,
                      'Timeout after NN seconds when looking for a host.')
+flags.DEFINE_bool('project_uniq_names', 'false', 'Unique names for each instance in project.')
 
 
 def generate_default_hostname(instance):
@@ -108,6 +111,7 @@ class API(base.Base):
             volume_api = volume.API()
         self.volume_api = volume_api
         self.hostname_factory = hostname_factory
+        self._instance_lock = threading.RLock()
         super(API, self).__init__(**kwargs)
 
     def _check_injected_file_quota(self, context, injected_files):
@@ -163,6 +167,12 @@ class API(base.Base):
 
         self.network_api.validate_networks(context, requested_networks)
 
+    def _check_unique_name(self, context, display_name):
+        project_id = context.project_id
+        instances = self.db.instance_get_all_by_filters(context, {'project_id' : project_id, 'display_name' : display_name, 'deleted' : False})
+        if len(instances):
+            raise exc.HTTPBadRequest(explanation="Instance with such name alredy exist in the project")
+
     def _check_create_parameters(self, context, instance_type,
                image_href, kernel_id=None, ramdisk_id=None,
                min_count=None, max_count=None,
@@ -201,6 +211,8 @@ class API(base.Base):
         self._check_metadata_properties_quota(context, metadata)
         self._check_injected_file_quota(context, injected_files)
         self._check_requested_networks(context, requested_networks)
+        if FLAGS.project_uniq_names:
+            self._check_unique_name(context, display_name)
 
         (image_service, image_id) = nova.image.get_image_service(context,
                                                                  image_href)
@@ -479,10 +491,13 @@ class API(base.Base):
         the Scheduler for execution. Returns a Reservation ID
         related to the creation of all of these instances."""
 
-        if not metadata:
-            metadata = {}
+        self._instance_lock.acquire()
 
-        num_instances, base_options, image = self._check_create_parameters(
+        try:
+            if not metadata:
+                metadata = {}
+            LOG.debug('Creating all instances at once')
+            num_instances, base_options, image = self._check_create_parameters(
                                context, instance_type,
                                image_href, kernel_id, ramdisk_id,
                                min_count, max_count,
@@ -493,13 +508,14 @@ class API(base.Base):
                                reservation_id, access_ip_v4, access_ip_v6,
                                requested_networks, config_drive)
 
-        self._ask_scheduler_to_create_instance(context, base_options,
+            self._ask_scheduler_to_create_instance(context, base_options,
                                       instance_type, zone_blob,
                                       availability_zone, injected_files,
                                       admin_password, image,
                                       num_instances=num_instances,
                                       requested_networks=requested_networks)
-
+        finally:
+            self._instance_lock.release()
         return base_options['reservation_id']
 
     def create(self, context, instance_type,
@@ -523,11 +539,13 @@ class API(base.Base):
 
         Returns a list of instance dicts.
         """
+        self._instance_lock.acquire()
 
-        if not metadata:
-            metadata = {}
+        try:
+            if not metadata:
+                metadata = {}
 
-        num_instances, base_options, image = self._check_create_parameters(
+            num_instances, base_options, image = self._check_create_parameters(
                                context, instance_type,
                                image_href, kernel_id, ramdisk_id,
                                min_count, max_count,
@@ -538,24 +556,25 @@ class API(base.Base):
                                reservation_id, access_ip_v4, access_ip_v6,
                                requested_networks, config_drive)
 
-        block_device_mapping = block_device_mapping or []
-        instances = []
-        LOG.debug(_("Going to run %s instances..."), num_instances)
-        for num in range(num_instances):
-            instance = self.create_db_entry_for_new_instance(context,
+            block_device_mapping = block_device_mapping or []
+            instances = []
+            LOG.debug(_("Going to run %s instances..."), num_instances)
+            for num in range(num_instances):
+                instance = self.create_db_entry_for_new_instance(context,
                                     instance_type, image,
                                     base_options, security_group,
                                     block_device_mapping, num=num)
-            instances.append(instance)
-            instance_id = instance['id']
+                instances.append(instance)
+                instance_id = instance['id']
 
-            self._ask_scheduler_to_create_instance(context, base_options,
+                self._ask_scheduler_to_create_instance(context, base_options,
                                         instance_type, zone_blob,
                                         availability_zone, injected_files,
                                         admin_password, image,
                                         instance_id=instance_id,
                                         requested_networks=requested_networks)
-
+        finally:
+            self._instance_lock.release()
         return [dict(x.iteritems()) for x in instances]
 
     def has_finished_migration(self, context, instance_uuid):
@@ -740,7 +759,13 @@ class API(base.Base):
 
         :returns: None
         """
-        rv = self.db.instance_update(context, instance_id, kwargs)
+        self._instance_lock.acquire()
+        try:
+            if kwargs.get('display_name', None):
+                self._check_unique_name(context, kwargs['display_name'])
+            rv = self.db.instance_update(context, instance_id, kwargs)
+        finally:
+            self._instance_lock.release()
         return dict(rv.iteritems())
 
     def _get_instance(self, context, instance_id, action_str):
