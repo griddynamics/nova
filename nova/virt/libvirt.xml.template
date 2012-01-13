@@ -56,19 +56,19 @@
 #else
     #if $getVar('rescue', False)
         <disk type='file'>
-            <driver type='${driver_type}'/>
+            <driver type='raw'/>
             <source file='${basepath}/disk.rescue'/>
             <target dev='${disk_prefix}a' bus='${disk_bus}'/>
         </disk>
         <disk type='file'>
-            <driver type='${driver_type}'/>
+            <driver type='raw'/>
             <source file='${basepath}/disk'/>
             <target dev='${disk_prefix}b' bus='${disk_bus}'/>
         </disk>
     #else
         #if not ($getVar('ebs_root', False))
         <disk type='file'>
-            <driver type='${driver_type}'/>
+            <driver type='raw'/>
             <source file='${basepath}/disk'/>
             <target dev='${root_device}' bus='${disk_bus}'/>
         </disk>
