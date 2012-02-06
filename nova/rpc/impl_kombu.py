@@ -707,6 +707,7 @@ class MulticallWaiter(object):
 
     def __call__(self, data):
         """The consume() callback will call this.  Store the result."""
+        LOG.debug("Receive response %s", data)
         if data['failure']:
             self._result = RemoteError(*data['failure'])
         elif data.get('ending', False):
@@ -757,11 +758,15 @@ def multicall(context, topic, msg):
 
 def call(context, topic, msg):
     """Sends a message on a topic and wait for a response."""
+    LOG.debug("Do rpc call with %s message on %s topic", context, msg, topic)
     rv = multicall(context, topic, msg)
     # NOTE(vish): return the last result from the multicall
     rv = list(rv)
+    LOG.debug('rpc.call results: %s', rv)
     if not rv:
+        LOG.debug('rpc.call return to caller: None')
         return
+    LOG.debug('rpc.call return to caller: %s', rv[-1])
     return rv[-1]
 
 
