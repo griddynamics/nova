@@ -18,6 +18,7 @@ import kombu
 import kombu.entity
 import kombu.messaging
 import kombu.connection
+from kombu.transport.amqplib import AMQPConnectionException
 import itertools
 import sys
 import time
@@ -35,6 +36,9 @@ from nova import exception
 from nova import flags
 import nova.rpc.common as rpc_common
 from nova.rpc.common import RemoteError, LOG
+
+def _(msg):
+    return msg
 
 # Needed for tests
 eventlet.monkey_patch()
@@ -381,7 +385,16 @@ class Connection(object):
         """Reset a connection so it can be used again"""
         self.cancel_consumer_thread()
         self.channel.close()
-        self.channel = self.connection.channel()
+        for i in xrange(1, 7):
+            try:
+                self.channel = self.connection.channel()
+            except AMQPConnectionException, e:
+                if e.args[0] == 503 and i < 6: # Exception code: COMMAND_INVALID - second 'channel.open' seen
+                    time.sleep(0.01 * i)
+                    continue
+                else:
+                    raise e
+            break
         # work around 'memory' transport bug in 1.1.3
         if self.memory_transport:
             self.channel._new_queue('ae.undeliver')
