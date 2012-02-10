@@ -758,7 +758,7 @@ def multicall(context, topic, msg):
 
 def call(context, topic, msg):
     """Sends a message on a topic and wait for a response."""
-    LOG.debug("Do rpc call with %s message on %s topic", context, msg, topic)
+    LOG.debug("Do rpc call with %s message on %s topic", msg, topic)
     rv = multicall(context, topic, msg)
     # NOTE(vish): return the last result from the multicall
     rv = list(rv)
