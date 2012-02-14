@@ -23,8 +23,9 @@ from xml.etree import ElementTree
 from eventlet.green import time
 from nova import utils, exception
 from nova.flags import FLAGS
+from nova.virt import disk, images
 
-LOG = logging.getLogger('nova.disk.image')
+LOG = logging.getLogger('nova.virt.libvirt.image')
 
 
 def select_driver():
@@ -235,6 +236,23 @@ class Image(object):
         """Check that image is created in filesystem"""
         return os.path.exists(path=self.path())
 
+    def _assert_image_not_larger(self, base, size):
+        """
+        Asserts that given base image isn't larger than resulting image
+        :param base: base image's path
+        :param size: target size in bytes, can be None
+        """
+        # do not perform assertion if size wasn't given
+        if not size:
+            return
+        base_image_size = images.virtual_size(base)
+        LOG.debug(_("image_size_bytes=%(base_image_size)d, "
+                    "allowed_size_bytes=%(size)d") % locals())
+        if base_image_size > size:
+            LOG.info(_("Image size %(base_image_size)d exceeded instance_type "
+                       "allowed size %(size)d") % locals())
+            raise exception.ImageTooLarge()
+
     @abc.abstractmethod
     def make_snapshot(self, virt_domain, snapshot_name, force_live_snapshot):
         """Create snapshot of a image
@@ -251,10 +269,13 @@ class Image(object):
                                   'in subclasses')
 
     @abc.abstractmethod
-    def create_from_raw(self, base):
+    def create_from_raw(self, base, size=None):
         """Create image from base image.
         :type base: string
-        :param base: base image path"""
+        :param base: base image path
+        :type size: int
+        :param size: the size of resulting image in bytes
+        """
         raise NotImplementedError('This method should '
                                   'be implemented '
                                   'in subclasses')
@@ -278,7 +299,6 @@ class Image(object):
     @abc.abstractmethod
     def delete(self):
         """Delete image"""
-
         raise NotImplementedError('This method should '
                                   'be implemented '
                                   'in subclasses')
@@ -317,8 +337,11 @@ class RawImage(_FileImage):
         super(RawImage, self).__init__()
         self.image_path = image_path
 
-    def create_from_raw(self, base):
+    def create_from_raw(self, base, size=None):
+        self._assert_image_not_larger(base, size)
         utils.execute('cp', base, self.image_path)
+        if size:
+            disk.extend(self.image_path, size)
 
     def create_clean(self, size):
         self._create_clean(size, 'raw')
@@ -336,10 +359,13 @@ class QcowImage(_FileImage):
         super(QcowImage, self).__init__()
         self.image_path = image_path
 
-    def create_from_raw(self, base):
+    def create_from_raw(self, base, size=None):
+        self._assert_image_not_larger(base, size)
         utils.execute('qemu-img', 'create', '-f', 'qcow2', '-o',
             'cluster_size=2M,backing_file=%s' % base,
             self.path())
+        if size:
+            disk.extend(self.image_path, size)
 
     def create_clean(self, size):
         self._create_clean(size, 'qcow2')
@@ -359,15 +385,24 @@ class LvmImage(Image):
         self.lv = lv
         self._path = os.path.join('/dev', vg, lv)
 
-    def create_from_raw(self, base):
+    def create_from_raw(self, base, size=None):
         """
             Creating volume from raw image.
         """
-        self.create_clean(self._image_size(base))
+        self._assert_image_not_larger(base, size)
+        if not size:
+            size = images.virtual_size(base)
         target = self.path()
+
+        self.create_clean(size)
+
         LOG.info(_("disk %s converting to lvm volume %s"), (base, self.lv))
         utils.execute('qemu-img', 'convert', base, '-O',
-            'raw', target, run_as_root=True)
+                      'raw', target, run_as_root=True)
+        utils.execute('e2fsck', '-fp', target,
+                      run_as_root=True, check_exit_code=False)
+        utils.execute('resize2fs', target,
+                      run_as_root=True, check_exit_code=False)
 
     def create_clean(self, size):
         LOG.info(_("lvm volume %s with size %db: creating"),
@@ -376,7 +411,7 @@ class LvmImage(Image):
             self.lv, self.vg, run_as_root=True)
 
     def make_snapshot(self, virt_domain, snapshot_name, force_live_snapshot):
-        size = self._image_size(self._path)
+        size = images.virtual_size(self._path)
         return LvmSnapshot(virt_domain, self.vg,
                            snapshot_name, size,
                            self.path(), force_live_snapshot)
@@ -414,18 +449,6 @@ class LvmImage(Image):
                 if tries >= 3:
                     raise
                 time.sleep(tries ** 2)
-
-    def _image_size(self, image_path):
-        img_info = utils.execute('qemu-img', 'info', image_path, run_as_root=True)
-        lines = img_info[0].split('\n')
-        data = {}
-        for line in lines:
-            if not line:
-                continue
-            k, v = line.split(':')
-            data[k] = v.strip()
-        size = data['virtual size'].split('(')[1].split()[0]
-        return int(size)
 
     def resize(self, size):
         if self._image_size(self.path())  != size:
