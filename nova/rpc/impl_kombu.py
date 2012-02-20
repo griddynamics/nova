@@ -385,11 +385,12 @@ class Connection(object):
         """Reset a connection so it can be used again"""
         self.cancel_consumer_thread()
         self.channel.close()
-        for i in xrange(1, 7):
+        max_tries = 17
+        for i in xrange(1, max_tries+1):
             try:
                 self.channel = self.connection.channel()
             except AMQPConnectionException, e:
-                if e.args[0] == 503 and i < 6: # Exception code: COMMAND_INVALID - second 'channel.open' seen
+                if e.args[0] == 503 and i < max_tries: # Exception code: COMMAND_INVALID - second 'channel.open' seen
                     time.sleep(0.01 * i)
                     continue
                 else:
