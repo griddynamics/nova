@@ -42,6 +42,10 @@ def db_sync(version=None):
     repo_path = _find_migrate_repo()
     return versioning_api.upgrade(FLAGS.sql_connection, repo_path, version)
 
+def db_downgrade(version):
+    db_version()
+    repo_path = _find_migrate_repo()
+    return versioning_api.downgrade(FLAGS.sql_connection, repo_path, version)
 
 def db_version():
     repo_path = _find_migrate_repo()
@@ -65,7 +69,7 @@ def db_version():
                           'user_project_role_association',
                           'user_role_association',
                           'virtual_storage_arrays',
-                          'volumes', 'volume_metadata',
+                          'volumes', 'local_volumes', 'volume_metadata',
                           'volume_types', 'volume_type_extra_specs'):
                 assert table in meta.tables
             return db_version_control(1)

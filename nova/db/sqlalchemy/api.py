@@ -1183,6 +1183,7 @@ def _build_instance_get(context, session=None):
                      options(joinedload('virtual_interfaces')).\
                      options(joinedload_all('security_groups.rules')).\
                      options(joinedload('volumes')).\
+                     options(joinedload('local_volumes')).\
                      options(joinedload('metadata')).\
                      options(joinedload('instance_type'))
 
@@ -2358,9 +2359,9 @@ def volume_get_all_by_project(context, project_id):
 
 
 @require_admin_context
-def volume_get_instance(context, volume_id):
+def _volume_get_instance(context, volume_id, volume_class):
     session = get_session()
-    result = session.query(models.Volume).\
+    result = session.query(volume_class).\
                      filter_by(id=volume_id).\
                      filter_by(deleted=can_read_deleted(context)).\
                      options(joinedload('instance')).\
@@ -2372,6 +2373,9 @@ def volume_get_instance(context, volume_id):
 
     return result.instance
 
+@require_admin_context
+def volume_get_instance(context, volume_id):
+    return _volume_get_instance(context, volume_id, models.Volume)
 
 @require_admin_context
 def volume_get_shelf_and_blade(context, volume_id):
@@ -2412,6 +2416,119 @@ def volume_update(context, volume_id, values):
         volume_ref.save(session=session)
 
 
+####################
+
+@require_context
+def local_volume_get_all_by_project(context, project_id):
+    authorize_project_context(context, project_id)
+
+    session = get_session()
+    return session.query(models.LocalVolume).\
+    options(joinedload('instance')).\
+    filter_by(project_id=project_id).\
+    filter_by(deleted=can_read_deleted(context)).\
+    all()
+
+@require_context
+def local_volume_get_all(context):
+    session = get_session()
+    return session.query(models.LocalVolume).\
+    options(joinedload('instance')).\
+    filter_by(deleted=can_read_deleted(context)).\
+    all()
+
+@require_context
+def local_volume_create(context, values):
+    values['volume_metadata'] = _metadata_refs(values.get('metadata'),
+        models.VolumeMetadata)
+    volume_ref = models.LocalVolume()
+    volume_ref.update(values)
+
+    session = get_session()
+    with session.begin():
+        volume_ref.save(session=session)
+    return volume_ref
+
+@require_admin_context
+def local_volume_attached(context, volume_id, instance_id, mountpoint):
+    session = get_session()
+    with session.begin():
+        volume_ref = local_volume_get(context, volume_id, session=session)
+        volume_ref['status'] = 'in-use'
+        volume_ref['mountpoint'] = mountpoint
+        volume_ref['attach_status'] = 'attached'
+        volume_ref.instance = instance_get(context, instance_id,
+            session=session)
+        volume_ref.save(session=session)
+
+@require_admin_context
+def local_volume_detached(context, volume_id):
+    session = get_session()
+    with session.begin():
+        volume_ref = local_volume_get(context, volume_id, session=session)
+        volume_ref['mountpoint'] = None
+        volume_ref['attach_status'] = 'detached'
+        volume_ref.instance = None
+        volume_ref.save(session=session)
+
+@require_context
+def local_volume_update(context, volume_id, values):
+    session = get_session()
+    metadata = values.get('metadata')
+    if metadata is not None:
+        volume_metadata_update(context,
+            volume_id,
+            values.pop('metadata'),
+            delete=True)
+    with session.begin():
+        volume_ref = local_volume_get(context, volume_id, session=session)
+        volume_ref.update(values)
+        volume_ref.save(session=session)
+
+
+def local_volume_destroy(context, volume_id):
+    session = get_session()
+    with session.begin():
+        session.query(models.LocalVolume).\
+        filter_by(id=volume_id).\
+        update({'deleted': True,
+                'status': models.LocalVolume.DELETED,
+                'deleted_at': utils.utcnow(),
+                'updated_at': literal_column('updated_at')})
+        session.query(models.VolumeMetadata).\
+        filter_by(volume_id=volume_id).\
+        update({'deleted': True,
+                'deleted_at': utils.utcnow(),
+                'updated_at': literal_column('updated_at')})
+
+
+@require_context
+def local_volume_get(context, volume_id, session=None):
+    if not session:
+        session = get_session()
+    result = None
+
+    if is_admin_context(context):
+        result = session.query(models.LocalVolume).\
+        options(joinedload('instance')).\
+        filter_by(id=volume_id).\
+        filter_by(deleted=can_read_deleted(context)).\
+        first()
+    elif is_user_context(context):
+        result = session.query(models.LocalVolume).\
+        options(joinedload('instance')).\
+        filter_by(project_id=context.project_id).\
+        filter_by(id=volume_id).\
+        filter_by(deleted=False).\
+        first()
+    if not result:
+        raise exception.VolumeNotFound(volume_id=volume_id)
+
+    return result
+
+@require_admin_context
+def local_volume_get_instance(context, volume_id):
+    return _volume_get_instance(context, volume_id, models.LocalVolume)
 ####################
 
 

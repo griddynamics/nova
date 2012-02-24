@@ -46,6 +46,7 @@ import shutil
 import sys
 import tempfile
 import time
+from timemodule import sleep
 import uuid
 from xml.dom import minidom
 
@@ -66,7 +67,6 @@ from nova.virt import disk
 from nova.virt import driver
 from nova.virt import images
 from nova.virt.libvirt.image import select_driver
-from nova.virt.injector import FileInjector
 
 
 libvirt = None
@@ -367,6 +367,62 @@ class LibvirtConnection(driver.ComputeDriver):
         if FLAGS.libvirt_type == 'lxc':
             disk.destroy_container(instance, image=image)
 
+    def _local_volume_image(self, instance_name, volume_name):
+        return self.image_driver.create_image(instance_name, volume_name, '.localvolume')
+
+    def _local_volume_image_info(self, instance_name, volume_name):
+        return self.image_driver.libvirt_image_info(instance_name, volume_name, '.localvolume')
+
+    @exception.wrap_exception()
+    def create_local_volume(self, context, instance, volume_name, size, snapshot_id=None):
+        image = self._local_volume_image(instance['name'], volume_name)
+
+        if snapshot_id:
+            base_path = self._cache_image(self._fetch_image, volume_name,
+                context=context,
+                image_id=snapshot_id,
+                user_id=instance['user_id'],
+                project_id=instance['project_id'])
+            image.create_from_raw(base_path)
+            LOG.debug(_("local volume %s: created successfully from snapshot (snapshot id: %s)"),
+                image.path(), snapshot_id)
+
+            if size:
+                image.resize(size)
+                LOG.debug(_("local volume %s: resized successfully to size %d b"),
+                    image.path(), size)
+        elif size:
+            image.create_clean(size)
+            LOG.debug(_("local volume %s: created successfully"), image.path())
+        else:
+            raise RuntimeError("template_id or size must be specified")
+
+    @exception.wrap_exception()
+    def delete_local_volume(self, instance, volume_name):
+        image = self._local_volume_image(instance['name'], volume_name)
+        image.delete()
+
+    @exception.wrap_exception()
+    def resize_local_volume(self, instance, volume_name, new_size):
+        image = self._local_volume_image(instance['name'], volume_name)
+        image.resize(new_size)
+        LOG.info("Resize of volume %s is finished" % volume_name)
+
+    @exception.wrap_exception()
+    def attach_local_volume(self, instance_name, volume_name, device):
+        image = self._local_volume_image(instance_name, volume_name)
+        image_info = self._local_volume_image_info(instance_name, volume_name)
+        image_info['target_device'] = os.path.basename(device)
+        virt_dom = self._lookup_by_name(instance_name)
+        xml = """<disk type='%(device_type)s'>
+                    <driver name='qemu' type='%(driver_type)s'/>
+                    <source %(source_type)s='%(disk)s'/>
+                    <target dev='%(target_device)s' bus='virtio'/>
+                 </disk>""" % image_info
+        virt_dom.attachDevice(xml)
+        LOG.debug(_("local volume %s: attached successfully to instance (instance name: %s)"),
+            image.path(), instance_name)
+
     @exception.wrap_exception()
     def attach_volume(self, instance_name, device_path, mountpoint):
         virt_dom = self._lookup_by_name(instance_name)
@@ -416,63 +472,101 @@ class LibvirtConnection(driver.ComputeDriver):
             raise exception.DiskNotFound(location=mount_device)
         virt_dom.detachDevice(xml)
 
-    @exception.wrap_exception()
-    def snapshot(self, context, instance, image_href, force_live_snapshot):
-        """Create snapshot from a VM instance.
+    def _create_snapshot_metadata(self, context, instance, snapshot_href, disk_href=None):
+        base = {}
 
-        This command only works with qemu 0.14+
-        """
+        (image_service, snapshot_image_id) =\
+        nova.image.get_image_service(context, snapshot_href)
+        snapshot = image_service.show(context, snapshot_image_id)
 
-        virt_dom = self._lookup_by_name(instance['name'])
-
-        (image_service, image_id) = nova.image.get_image_service(
-            context, instance['image_ref'])
-        base = image_service.show(context, image_id)
-        (snapshot_image_service, snapshot_image_id) = \
-            nova.image.get_image_service(context, image_href)
-        snapshot = snapshot_image_service.show(context, snapshot_image_id)
+        if disk_href:
+            (image_service, disk_href) = nova.image.get_image_service(
+                context, disk_href)
+            base = image_service.show(context, disk_href)
 
         metadata = {'is_public': False,
                     'status': 'active',
                     'name': snapshot['name'],
                     'properties': {
-                                   'kernel_id': instance['kernel_id'],
-                                   'image_location': 'snapshot',
-                                   'image_state': 'available',
-                                   'owner_id': instance['project_id'],
-                                   'ramdisk_id': instance['ramdisk_id'],
-                                   }
-                    }
-        if 'architecture' in base['properties']:
+                        'kernel_id': instance['kernel_id'],
+                        'image_location': 'snapshot',
+                        'image_state': 'available',
+                        'owner_id': instance['project_id'],
+                        'ramdisk_id': instance['ramdisk_id'],
+                        }
+        }
+        if 'architecture' in base.get('properties', {}):
             arch = base['properties']['architecture']
             metadata['properties']['architecture'] = arch
 
         # NOTE(vish): glance forces ami disk format to be ami
-        if base.get('disk_format') == 'ami':
+        if 'disk_format' in base and base.get('disk_format') == 'ami':
             metadata['disk_format'] = 'ami'
         else:
-            metadata['disk_format'] = image_format
+            metadata['disk_format'] = self.image_driver.disk_format()
 
         if 'container_format' in base:
             metadata['container_format'] = base['container_format']
 
+        return image_service, metadata
+
+    def _snapshot(self, image, instance, upload_snapshot, force_live_snapshot):
+        """
+        Make snapshot of image and export it to glance
+        """
+
+        virt_dom = self._lookup_by_name(instance['name'])
+
         snapshot_name = uuid.uuid4().hex
 
         temp_dir = tempfile.mkdtemp()
-        out_path = os.path.join(temp_dir, snapshot_name)
-        image = self.image_driver.create_image(instance['name'], 'disk')
+        snapshot_path = os.path.join(temp_dir, snapshot_name)
         try:
             with image.make_snapshot(virt_dom, snapshot_name,
-                                     force_live_snapshot) as snapshot:
-                snapshot.convert_to_raw(out_path)
-                # Upload this snapshot to the image service
-                with open(out_path) as image_file:
-                    image_service.update(context,
-                                         image_href,
-                                         metadata,
-                                         image_file)
+                force_live_snapshot) as snapshot:
+                snapshot.convert_to_raw(snapshot_path)
+                upload_snapshot(snapshot_path=snapshot_path)
         finally:
             shutil.rmtree(temp_dir)
+
+    @exception.wrap_exception()
+    def snapshot_local_volume(self, context, volume_name, instance, snapshot_href, force_live_snapshot):
+        """
+        Create snapshot of local volume
+        """
+        image_service, metadata = self._create_snapshot_metadata(context,
+            instance, snapshot_href)
+
+        upload_snapshot = functools.partial(self._upload_snapshot, context=context,
+            image_service=image_service, metadata=metadata,
+            snapshot_href=snapshot_href)
+
+        image = self._local_volume_image(instance['name'], volume_name)
+        self._snapshot(image, instance, upload_snapshot, force_live_snapshot)
+
+    @exception.wrap_exception()
+    def snapshot(self, context, instance, snapshot_href, force_live_snapshot):
+        """Create snapshot from a VM instance.
+
+        This command only works with qemu 0.14+
+        """
+        image = self.image_driver.create_image(instance['name'], 'disk')
+
+        image_service, metadata = self._create_snapshot_metadata(context,
+            instance, snapshot_href, instance['image_ref'])
+
+        upload_snapshot = functools.partial(self._upload_snapshot, context=context,
+            image_service=image_service, metadata=metadata, snapshot_href=snapshot_href)
+
+        self._snapshot(image, instance, upload_snapshot, force_live_snapshot)
+
+    def _upload_snapshot(self, context, image_service, metadata, snapshot_href, snapshot_path):
+        # Upload this snapshot to the image service
+        with open(snapshot_path) as image_file:
+            image_service.update(context,
+                snapshot_href,
+                metadata,
+                image_file)
 
     @exception.wrap_exception()
     def reboot(self, instance, network_info, xml=None):
@@ -984,6 +1078,14 @@ class LibvirtConnection(driver.ComputeDriver):
                            'nets into image %(img_id)s'
                            % locals()))
             try:
+                #libvirt change permissions to root workaround
+                def change_owner(path):
+                    utils.execute('chown', 'nova:nova', path, run_as_root=True)
+                    utils.execute('chmod', '0644', path, run_as_root=True)
+                    #if target is symbolic link change it's rights too
+                    utils.execute('chown', '-h', 'nova:nova', path, run_as_root=True)
+
+                change_owner(image.path())
                 disk.inject_data(image.path(), key, nets, metadata, injected_files, admin_pass)
             except Exception as e:
                 # This could be a windows image, or a vmdk format disk
@@ -1068,7 +1170,7 @@ class LibvirtConnection(driver.ComputeDriver):
 
         ephemerals = []
         for eph in driver.block_device_info_get_ephemerals(block_device_info):
-            ephemeral_info = self.image_driver.image_info(instance['name'],
+            ephemeral_info = self.image_driver.libvirt_image_info(instance['name'],
                                                           eph['device_name'])
             ephemerals.append(ephemeral_info)
 
@@ -1091,7 +1193,7 @@ class LibvirtConnection(driver.ComputeDriver):
 
         if local_device:
             xml_info['local_device_info'] = \
-            self.image_driver.image_info(instance['name'], 'disk.local')
+            self.image_driver.libvirt_image_info(instance['name'], 'disk.local')
 
         root_device_name = driver.block_device_info_get_root(block_device_info)
         if root_device_name:
@@ -1136,7 +1238,7 @@ class LibvirtConnection(driver.ComputeDriver):
             if instance['ramdisk_id']:
                 xml_info['ramdisk'] = xml_info['basepath'] + "/ramdisk"
 
-            disk_info = self.image_driver.image_info(instance['name'], 'disk')
+            disk_info = self.image_driver.libvirt_image_info(instance['name'], 'disk')
             xml_info.update(disk_info)
 
         return xml_info

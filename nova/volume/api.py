@@ -41,6 +41,8 @@ LOG = logging.getLogger('nova.volume')
 class API(base.Base):
     """API for interacting with the volume manager."""
 
+
+
     def create(self, context, size, snapshot_id, name, description,
                      volume_type=None, metadata=None, availability_zone=None):
         if snapshot_id != None:
