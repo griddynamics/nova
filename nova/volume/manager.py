@@ -109,7 +109,7 @@ class VolumeManager(manager.SchedulerDependentManager):
         try:
             vol_name = volume_ref['name']
             vol_size = volume_ref['size']
-            LOG.debug(_("volume %(vol_name)s: creating lv of"
+            LOG.debug(_("volume %(vol_name)s: creating volume of"
                     " size %(vol_size)sG") % locals())
             if snapshot_id == None:
                 model_update = self.driver.create_volume(volume_ref)
@@ -246,10 +246,10 @@ class VolumeManager(manager.SchedulerDependentManager):
             path = self.driver.discover_volume(context, volume_ref)
         return path
 
-    def remove_compute_volume(self, context, volume_id):
+    def remove_compute_volume(self, context, volume_id, local=False):
         """Remove remote volume on compute host."""
         context = context.elevated()
-        volume_ref = self.db.volume_get(context, volume_id)
+        volume_ref = self.db.volume_get(context, volume_id, local)
         if volume_ref['host'] == self.host and FLAGS.use_local_volumes:
             return True
         else:

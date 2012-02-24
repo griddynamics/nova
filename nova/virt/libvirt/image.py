@@ -24,7 +24,7 @@ from eventlet.green import time
 from nova import utils, exception
 from nova.flags import FLAGS
 
-LOG = logging.getLogger('nova.virt.libvirt.image')
+LOG = logging.getLogger('nova.disk.image')
 
 
 def select_driver():
@@ -51,6 +51,15 @@ def select_driver():
 class ImageDriver(object):
 
     __metaclass__ = abc.ABCMeta
+
+    @classmethod
+    @abc.abstractmethod
+    def disk_format(cls):
+        """Get disk format type.
+        """
+        raise NotImplementedError('This method should '
+                                  'be implemented '
+                                  'in subclasses')
 
     @classmethod
     @abc.abstractmethod
@@ -82,7 +91,7 @@ class ImageDriver(object):
 
     @classmethod
     @abc.abstractmethod
-    def image_info(cls, instance_name, image_name=None, suffix=None):
+    def libvirt_image_info(cls, instance_name, image_name=None, suffix=None):
         """Libvirt image info
         :type instance_name: string
         :param instance_name: name of instance
@@ -97,6 +106,10 @@ class ImageDriver(object):
 
 
 class LvmImageDriver(ImageDriver):
+
+    @classmethod
+    def disk_format(cls):
+        return 'raw'
 
     @classmethod
     def create_image(cls, instance_name, image_name=None, suffix=None):
@@ -136,7 +149,7 @@ class LvmImageDriver(ImageDriver):
         return images
 
     @classmethod
-    def image_info(cls, instance_name, image_name=None, suffix=None):
+    def libvirt_image_info(cls, instance_name, image_name=None, suffix=None):
         lv_name = cls._lv_name(instance_name, image_name, suffix)
         return {
             'device_type': 'block',
@@ -166,6 +179,10 @@ class _FileImageDriver(ImageDriver):
 
 class RawImageDriver(_FileImageDriver):
     @classmethod
+    def disk_format(cls):
+        return 'raw'
+
+    @classmethod
     def create_image(cls, instance_name, image_name, suffix=None):
         image_path = cls._image_path(instance_name, image_name, suffix)
         return RawImage(image_path)
@@ -175,7 +192,7 @@ class RawImageDriver(_FileImageDriver):
         return [RawImage(path) for path in cls._list_disks(virt_domain)]
 
     @classmethod
-    def image_info(cls, instance_name, image_name=None, suffix=None):
+    def libvirt_image_info(cls, instance_name, image_name=None, suffix=None):
         return {
             'device_type': 'file',
             'source_type': 'file',
@@ -186,6 +203,10 @@ class RawImageDriver(_FileImageDriver):
 
 class QcowImageDriver(_FileImageDriver):
     @classmethod
+    def disk_format(cls):
+        return 'qcow2'
+
+    @classmethod
     def create_image(cls, instance_name, image_name, suffix=None):
         image_path = cls._image_path(instance_name, image_name, suffix)
         return QcowImage(image_path)
@@ -195,7 +216,7 @@ class QcowImageDriver(_FileImageDriver):
         return [QcowImage(path) for path in cls._list_disks(virt_domain)]
 
     @classmethod
-    def image_info(cls, instance_name, image_name=None, suffix=None):
+    def libvirt_image_info(cls, instance_name, image_name=None, suffix=None):
         return {
             'device_type': 'file',
             'source_type': 'file',
@@ -239,6 +260,13 @@ class Image(object):
                                   'in subclasses')
 
     @abc.abstractmethod
+    def create_clean(self, size):
+        """Create clean image with specified size in bytes"""
+        raise NotImplementedError('This method should '
+                                  'be implemented '
+                                  'in subclasses')
+
+    @abc.abstractmethod
     def path(self):
         """Get image path
         :rtype: string
@@ -255,6 +283,17 @@ class Image(object):
                                   'be implemented '
                                   'in subclasses')
 
+    @abc.abstractmethod
+    def resize(self, size):
+        """
+        :type size: int
+        :param size: new size
+        :param unit: b, M, G size unit
+        Resize image"""
+
+        raise NotImplementedError('This method should '
+                                  'be implemented '
+                                  'in subclasses')
 
 class _FileImage(Image):
 
@@ -266,6 +305,11 @@ class _FileImage(Image):
         except OSError, e:
             LOG.error("Error during image delete: %s" % e)
 
+    def resize(self, size):
+        utils.execute('qemu-img', 'resize', self.path(), '%db' % size, run_as_root=True)
+
+    def _create_clean(self, size, format):
+        utils.execute('qemu-img', 'create', '-f', format, self.path(), '%db' % size)
 
 class RawImage(_FileImage):
 
@@ -275,6 +319,9 @@ class RawImage(_FileImage):
 
     def create_from_raw(self, base):
         utils.execute('cp', base, self.image_path)
+
+    def create_clean(self, size):
+        self._create_clean(size, 'raw')
 
     def path(self):
         return self.image_path
@@ -294,11 +341,15 @@ class QcowImage(_FileImage):
             'cluster_size=2M,backing_file=%s' % base,
             self.path())
 
+    def create_clean(self, size):
+        self._create_clean(size, 'qcow2')
+
     def path(self):
         return self.image_path
 
     def make_snapshot(self, virt_domain, snapshot_name, force_live_snapshot):
         return QcowSnapshot(virt_domain, snapshot_name, self.path())
+
 
 class LvmImage(Image):
 
@@ -312,17 +363,17 @@ class LvmImage(Image):
         """
             Creating volume from raw image.
         """
-        img_size = self._image_size(base)
+        self.create_clean(self._image_size(base))
         target = self.path()
-
-        LOG.info(_("lvm volume %s with size %db: creating"),
-            (self.lv, img_size))
-        self.__try_execute('lvcreate', '-L', '%db' % img_size, '-n',
-            self.lv, self.vg, run_as_root=True)
-
         LOG.info(_("disk %s converting to lvm volume %s"), (base, self.lv))
         utils.execute('qemu-img', 'convert', base, '-O',
             'raw', target, run_as_root=True)
+
+    def create_clean(self, size):
+        LOG.info(_("lvm volume %s with size %db: creating"),
+            (self.lv, size))
+        self.__try_execute('lvcreate', '-L', '%db' % size, '-n',
+            self.lv, self.vg, run_as_root=True)
 
     def make_snapshot(self, virt_domain, snapshot_name, force_live_snapshot):
         size = self._image_size(self._path)
@@ -376,6 +427,10 @@ class LvmImage(Image):
         size = data['virtual size'].split('(')[1].split()[0]
         return int(size)
 
+    def resize(self, size):
+        if self._image_size(self.path())  != size:
+            utils.execute('lvresize', '-f','-L', '%db' % size, self.path(), run_as_root=True)
+
     @classmethod
     def __delete_image(cls, volume):
         """Deletes a logical volume."""
@@ -395,17 +450,15 @@ class Snapshot(object):
 
     __metaclass__ = abc.ABCMeta
 
-    def __init__(self, virt_domain, snapshot_name):
-        """Initialize snapshot object by virDomain and name
-        :type virt_domain: :class:`libvirt.virDomain`
-        :param virt_domain: virDomain object of instance that owns this snapshot
+    def __init__(self, snapshot_name):
+        """Initialize snapshot object by name
         """
-        self._virt_domain = virt_domain
         self._snapshot_name = snapshot_name
 
     def __enter__(self):
         return self.create()
 
+    #noinspection PyUnusedLocal
     def __exit__(self, exc_type, exc_value, traceback):
         self.delete()
 
@@ -437,10 +490,11 @@ class Snapshot(object):
 class _LibvirtSnapshot(Snapshot):
 
     __metaclass__ = abc.ABCMeta
-    
+
     def __init__(self, virt_domain, snapshot_name, source_path):
-        super(_LibvirtSnapshot, self).__init__(virt_domain, snapshot_name)
+        super(_LibvirtSnapshot, self).__init__(snapshot_name)
         self._source_path = source_path
+        self._virt_domain = virt_domain
 
     def create(self):
         snapshot_description = """
@@ -459,7 +513,7 @@ class _LibvirtSnapshot(Snapshot):
                         '-O',
                         'raw',
                         '-s',
-                        os.path.basename(destination),
+                        self._snapshot_name,
                         self._source_path,
                         destination)
         utils.execute(*qemu_img_cmd, run_as_root=True)
@@ -489,11 +543,12 @@ class LvmSnapshot(Snapshot):
     def __init__(self, virt_domain, volume_group,
                  snapshot_name, snapshot_size,
                  source_path, force_live_snapshot):
-        super(LvmSnapshot, self).__init__(virt_domain, snapshot_name)
+        super(LvmSnapshot, self).__init__(snapshot_name)
         self._snapshot_path = os.path.join('/dev', volume_group, snapshot_name)
         self._snapshot_size = snapshot_size
         self._source_path = source_path
         self._force_live_snapshot = force_live_snapshot
+        self._virt_domain = virt_domain
 
     def create(self):
         if not self._force_live_snapshot and self._virt_domain.isActive():

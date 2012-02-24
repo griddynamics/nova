@@ -34,6 +34,10 @@ def db_sync(version=None):
     """Migrate the database to `version` or the most recent version."""
     return IMPL.db_sync(version=version)
 
+def db_downgrade(version):
+    """Downgrade the database to `version`"""
+    return IMPL.db_downgrade(version=version)
+
 
 def db_version():
     """Display the current database version."""

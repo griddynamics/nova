@@ -1160,6 +1160,12 @@ class DbCommands(object):
         """Sync the database up to the most recent version."""
         return migration.db_sync(version)
 
+    @args('--version', dest='version', metavar='<version>',
+        help='Database version')
+    def downgrade(self, version=None):
+        """Downgrade the database to specified version."""
+        return migration.db_downgrade(version)
+
     def version(self):
         """Print the current database version."""
         print migration.db_version()

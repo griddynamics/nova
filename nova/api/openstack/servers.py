@@ -210,6 +210,8 @@ class Controller(object):
         _actions = {
             'changePassword': self._action_change_password,
             'reboot': self._action_reboot,
+            'suspend': self._action_suspend,
+            'resume': self._action_resume,
             'resize': self._action_resize,
             'confirmResize': self._action_confirm_resize,
             'revertResize': self._action_revert_resize,
@@ -326,6 +328,22 @@ class Controller(object):
 
     def _action_resize(self, input_dict, req, id):
         return exc.HTTPNotImplemented()
+
+    def _action_suspend(self, input_dict, req, id):
+        try:
+            self.compute_api.suspend(req.environ['nova.context'], id)
+        except Exception, e:
+            LOG.exception(_("Error in suspend %s"), e)
+            raise exc.HTTPBadRequest()
+        return webob.Response(status_int=202)
+
+    def _action_resume(self, input_dict, req, id):
+        try:
+            self.compute_api.resume(req.environ['nova.context'], id)
+        except Exception, e:
+            LOG.exception(_("Error in resize %s"), e)
+            raise exc.HTTPBadRequest()
+        return webob.Response(status_int=202)
 
     def _action_reboot(self, input_dict, req, id):
         if 'reboot' in input_dict and 'type' in input_dict['reboot']:

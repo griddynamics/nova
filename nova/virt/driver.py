@@ -165,6 +165,18 @@ class ComputeDriver(object):
         # TODO(Vek): Need to pass context in for access to auth_token
         raise NotImplementedError()
 
+    def delete_local_volume(self, instance, volume_name):
+        """
+        Delete local volume
+        """
+        raise NotImplementedError()
+
+    def resize_local_volume(self, instance, volume_name, new_size):
+        """
+        Resize local volume
+        """
+        raise NotImplementedError()
+
     def reboot(self, instance, network_info):
         """Reboot the specified instance.
 
@@ -202,6 +214,10 @@ class ComputeDriver(object):
         # TODO(Vek): Need to pass context in for access to auth_token
         raise NotImplementedError()
 
+    def create_local_volume(self, instance, mountpoint, size):
+        """Create and attach local disk to instance at mountpoint"""
+        raise NotImplementedError()
+
     def attach_volume(self, context, instance_id, volume_id, mountpoint):
         """Attach the disk at device_path to the instance at mountpoint"""
         raise NotImplementedError()
@@ -230,6 +246,19 @@ class ComputeDriver(object):
         off the instance before the end.
         """
         # TODO(Vek): Need to pass context in for access to auth_token
+        raise NotImplementedError()
+
+    def snapshot_local_volume(self, context, volume_name, instance, image_id, force_live_snapshot):
+        """
+        Snapshots the specified local volume.
+
+        :param context: security context
+        :param volume_name: name of local volume
+        :param instance: Instance object as returned by DB layer.
+        :param image_id: Reference to a pre-created image that will
+                         hold the snapshot.
+        :param force_live_snapshot: always try perform snapshot on running instance
+        """
         raise NotImplementedError()
 
     def snapshot(self, context, instance, image_id, force_live_snapshot):

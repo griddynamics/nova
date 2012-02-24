@@ -22,14 +22,13 @@ SQLAlchemy models for nova data.
 
 from sqlalchemy.orm import relationship, backref, object_mapper
 from sqlalchemy import Column, Integer, String, schema
-from sqlalchemy import ForeignKey, DateTime, Boolean, Text, Float
+from sqlalchemy import ForeignKey, DateTime, Boolean, Text, Enum, Float
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.schema import ForeignKeyConstraint
+from sqlalchemy.schema import ForeignKeyConstraint, Table
 
 from nova.db.sqlalchemy.session import get_session
 
-from nova import auth
 from nova import exception
 from nova import flags
 from nova import ipv6
@@ -304,9 +303,19 @@ class InstanceTypes(BASE, NovaBase):
                                    ' == InstanceTypes.id)')
 
 
-class Volume(BASE, NovaBase):
-    """Represents a block storage device that can be attached to a vm."""
-    __tablename__ = 'volumes'
+class BaseVolume(NovaBase):
+
+    CREATING = 'creating'
+    AVAILABLE = 'available'
+    IN_USE = 'in-use'
+    ERROR = 'error'
+    DELETING = 'deleting'
+    ERROR_DELETING = 'error_deleting'
+    DELETED = 'deleted'
+
+    ATTACHED = 'attached'
+    DETACHED = 'detached'
+
     id = Column(Integer, primary_key=True, autoincrement=True)
 
     @property
@@ -320,29 +329,47 @@ class Volume(BASE, NovaBase):
 
     host = Column(String(255))  # , ForeignKey('hosts.id'))
     size = Column(Integer)
-    availability_zone = Column(String(255))  # TODO(vish): foreign key?
+
+    mountpoint = Column(String(255))
+    attach_time = Column(DateTime(timezone=False))
+    status = Column(Enum(CREATING, AVAILABLE, IN_USE, ERROR, DELETING, ERROR_DELETING, DELETED))
+    attach_status = Column(Enum(ATTACHED, DETACHED))
+
+    scheduled_at = Column(DateTime(timezone=False))
+    launched_at = Column(DateTime(timezone=False))
+    terminated_at = Column(DateTime(timezone=False))
+
+    display_description = Column(String(255))
+
+    volume_type_id = Column(Integer)
+
+class Volume(BASE, BaseVolume):
+    """Represents a block storage device that can be attached to a vm."""
+    __tablename__ = 'volumes'
+
     instance_id = Column(Integer, ForeignKey('instances.id'), nullable=True)
+    display_name = Column(String(255))
+
+    availability_zone = Column(String(255))  # TODO(vish): foreign key?
     instance = relationship(Instance,
                             backref=backref('volumes'),
                             foreign_keys=instance_id,
                             primaryjoin='and_(Volume.instance_id==Instance.id,'
                                              'Volume.deleted==False)')
-    mountpoint = Column(String(255))
-    attach_time = Column(String(255))  # TODO(vish): datetime
-    status = Column(String(255))  # TODO(vish): enum?
-    attach_status = Column(String(255))  # TODO(vish): enum
-
-    scheduled_at = Column(DateTime)
-    launched_at = Column(DateTime)
-    terminated_at = Column(DateTime)
-
-    display_name = Column(String(255))
-    display_description = Column(String(255))
-
     provider_location = Column(String(255))
     provider_auth = Column(String(255))
 
-    volume_type_id = Column(Integer)
+class LocalVolume(BASE, BaseVolume):
+    __tablename__ = 'local_volumes'
+
+    instance_id = Column(Integer, ForeignKey('instances.id'), nullable=True)
+    device = Column(String(255))
+
+    instance = relationship(Instance,
+            backref=backref('local_volumes'),
+            foreign_keys=instance_id,
+            primaryjoin='and_(LocalVolume.instance_id==Instance.id,'
+                        'LocalVolume.deleted==False)')
 
 
 class VolumeMetadata(BASE, NovaBase):

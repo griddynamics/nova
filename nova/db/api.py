@@ -898,13 +898,17 @@ def volume_allocate_iscsi_target(context, volume_id, host):
     return IMPL.volume_allocate_iscsi_target(context, volume_id, host)
 
 
-def volume_attached(context, volume_id, instance_id, mountpoint):
+def volume_attached(context, volume_id, instance_id, mountpoint, local=False):
     """Ensure that a volume is set as attached."""
+    if local:
+        return IMPL.local_volume_attached(context, volume_id, instance_id, mountpoint)
     return IMPL.volume_attached(context, volume_id, instance_id, mountpoint)
 
 
-def volume_create(context, values):
+def volume_create(context, values, local=False):
     """Create a volume from the values dictionary."""
+    if local:
+        return IMPL.local_volume_create(context, values)
     return IMPL.volume_create(context, values)
 
 
@@ -913,23 +917,31 @@ def volume_data_get_for_project(context, project_id):
     return IMPL.volume_data_get_for_project(context, project_id)
 
 
-def volume_destroy(context, volume_id):
+def volume_destroy(context, volume_id, local=False):
     """Destroy the volume or raise if it does not exist."""
+    if local:
+        return IMPL.local_volume_destroy(context, volume_id)
     return IMPL.volume_destroy(context, volume_id)
 
 
-def volume_detached(context, volume_id):
+def volume_detached(context, volume_id, local=False):
     """Ensure that a volume is set as detached."""
+    if local:
+        return IMPL.local_volume_detached(context, volume_id)
     return IMPL.volume_detached(context, volume_id)
 
 
-def volume_get(context, volume_id):
+def volume_get(context, volume_id, local=False):
     """Get a volume or raise if it does not exist."""
+    if local:
+        return IMPL.local_volume_get(context, volume_id)
     return IMPL.volume_get(context, volume_id)
 
 
-def volume_get_all(context):
+def volume_get_all(context, local=False):
     """Get all volumes."""
+    if local:
+        return IMPL.local_volume_get_all(context)
     return IMPL.volume_get_all(context)
 
 
@@ -943,8 +955,10 @@ def volume_get_all_by_instance(context, instance_id):
     return IMPL.volume_get_all_by_instance(context, instance_id)
 
 
-def volume_get_all_by_project(context, project_id):
+def volume_get_all_by_project(context, project_id, local=False):
     """Get all volumes belonging to a project."""
+    if local:
+        return IMPL.local_volume_get_all_by_project(context, project_id)
     return IMPL.volume_get_all_by_project(context, project_id)
 
 
@@ -953,8 +967,10 @@ def volume_get_by_ec2_id(context, ec2_id):
     return IMPL.volume_get_by_ec2_id(context, ec2_id)
 
 
-def volume_get_instance(context, volume_id):
+def volume_get_instance(context, volume_id, local=False):
     """Get the instance that a volume is attached to."""
+    if local:
+        return IMPL.local_volume_get_instance(context, volume_id)
     return IMPL.volume_get_instance(context, volume_id)
 
 
@@ -968,12 +984,14 @@ def volume_get_iscsi_target_num(context, volume_id):
     return IMPL.volume_get_iscsi_target_num(context, volume_id)
 
 
-def volume_update(context, volume_id, values):
+def volume_update(context, volume_id, values, local=False):
     """Set the given properties on an volume and update it.
 
     Raises NotFound if volume does not exist.
 
     """
+    if local:
+        return IMPL.local_volume_update(context, volume_id, values)
     return IMPL.volume_update(context, volume_id, values)
 
 

@@ -509,6 +509,10 @@ class ComputeManager(manager.SchedulerDependentManager):
         for volume in volumes:
             self._detach_volume(context, instance_id, volume['id'], False)
 
+        local_volumes = instance.get('local_volumes') or []
+        for volume in local_volumes:
+            self.delete_local_volume(context, volume['id'])
+
         if instance['power_state'] == power_state.SHUTOFF:
             self.db.instance_destroy(context, instance_id)
             raise exception.Error(_('trying to destroy already destroyed'
@@ -650,6 +654,36 @@ class ComputeManager(manager.SchedulerDependentManager):
                               power_state=current_power_state,
                               vm_state=vm_states.ACTIVE,
                               task_state=None)
+
+    @exception.wrap_exception(notifier=notifier, publisher_id=publisher_id())
+    def snapshot_local_volume(self, context, volume_name, instance_id, image_id, force_snapshot=False):
+        """Snapshot local volume on this host.
+
+        :param context: security context
+        :type instance_id: :class:`nova.db.sqlalchemy.models.Instance.Id`
+        :type image_id: :class:`glance.db.sqlalchemy.models.Image.Id`
+        :param image_type: snapshot | backup
+        :param backup_type: daily | weekly
+        :param rotation: int representing how many backups to keep around;
+            None if rotation shouldn't be used (as in the case of snapshots)
+        :param force_snapshot: try to perform snapshot on running instance
+            even if that can lead to unexpected errors
+        """
+        context = context.elevated()
+        instance = self.db.instance_get(context, instance_id)
+        current_power_state = self._get_power_state(context, instance)
+        self._instance_update(context, instance_id,
+            power_state=current_power_state,
+            vm_state=instance['vm_state'],
+            task_state = task_states.IMAGE_SNAPSHOT)
+
+        LOG.audit(_('Local volume %s: snapshotting'), volume_name,
+            context=context)
+
+        self.driver.snapshot_local_volume(context, volume_name, instance, image_id, force_snapshot)
+        self._instance_update(context, instance_id, task_state=None)
+
+
 
     @exception.wrap_exception(notifier=notifier, publisher_id=publisher_id())
     def snapshot_instance(self, context, instance_id, image_id,
@@ -1261,6 +1295,142 @@ class ComputeManager(manager.SchedulerDependentManager):
         instance_ref = self.db.instance_get(context, instance_id)
         return self.driver.get_vnc_console(instance_ref)
 
+    def create_local_volume(self, context, instance_id, device, volume_id, snapshot_id):
+        self._create_local_volume(context, instance_id, device, volume_id, snapshot_id)
+        self._attach_local_volume(context, instance_id, volume_id, device)
+
+    def _create_local_volume(self, context, instance_id, device, volume_id, snapshot_id):
+
+        context = context.elevated()
+
+        instance = self.db.instance_get(context, instance_id)
+
+        volume_ref = self.db.volume_get(context, volume_id, local=True)
+        LOG.info(_("volume %s: creating"), volume_ref['name'])
+
+        self.db.volume_update(context,
+            volume_id,
+                {'host': self.host}, local=True)
+
+        volume_ref['host'] = self.host
+
+        try:
+            vol_name = volume_ref['name']
+            vol_size = volume_ref['size']
+            vol_size_g = str(int(vol_size) * 1.0 / (1024 * 1024 * 1024))
+            LOG.debug(_("volume %(vol_name)s: creating local volume of"
+                        " size %(vol_size_g)sG") % locals())
+            model_update = self.driver.create_local_volume(context, instance, vol_name, vol_size, snapshot_id)
+
+            if model_update:
+                self.db.volume_update(context, volume_ref['id'], model_update, local=True)
+
+        except Exception:
+            with utils.save_and_reraise_exception():
+                self.db.volume_update(context,
+                    volume_ref['id'], {'status': 'error'}, local=True)
+
+        now = utils.utcnow()
+        self.db.volume_update(context,
+            volume_ref['id'], {'status': 'available',
+                               'launched_at': now}, local=True)
+
+    def delete_local_volume(self, context, volume_id):
+        """Deletes local volume."""
+        context = context.elevated()
+        volume_ref = self.db.volume_get(context, volume_id, local=True)
+
+        if volume_ref['host'] != self.host:
+            raise exception.Error(_("Volume is not local to this node"))
+
+        try:
+            instance_id = volume_ref['instance_id']
+            if volume_ref['attach_status'] == "attached":
+                LOG.debug(_("local volume %s: detaching"), volume_ref['name'])
+                self._detach_local_volume(context, instance_id, volume_id)
+
+            LOG.debug(_("local volume %s: deleting"), volume_ref['name'])
+            instance = self.db.instance_get(context, instance_id)
+            self.driver.delete_local_volume(instance, volume_ref['name'])
+        except exception.VolumeIsBusy, e:
+            LOG.debug(_("local volume %s: volume is busy"), volume_ref['name'])
+            self.db.volume_update(context, volume_ref['id'],
+                    {'status': 'in-use'}, local=True)
+            return True
+        except Exception:
+            with utils.save_and_reraise_exception():
+                self.db.volume_update(context,
+                    volume_ref['id'],
+                        {'status': 'error_deleting'}, local=True)
+            return True
+
+        self.db.volume_destroy(context, volume_id, local=True)
+        LOG.debug(_("local volume %s: deleted successfully"), volume_ref['name'])
+        return True
+
+    def resize_local_volume(self, context, volume_id, new_size):
+        context = context.elevated()
+        volume_ref = self.db.volume_get(context, volume_id, local=True)
+
+        if volume_ref['host'] != self.host:
+            raise exception.Error(_("Volume is not local to this node"))
+
+        try:
+            instance_id = volume_ref['instance_id']
+            LOG.debug(_("Resizing local volume %s to size %d"), volume_ref['name'], new_size)
+            instance = self.db.instance_get(context, instance_id)
+            self.driver.resize_local_volume(instance , volume_ref['name'], new_size)
+        except exception.VolumeIsBusy:
+            LOG.debug(_("local volume %s: volume is busy"), volume_ref['name'])
+            self.db.volume_update(context, volume_ref['id'],
+                    {'status': 'in-use'}, local=True)
+            return True
+        except Exception:
+            with utils.save_and_reraise_exception():
+                self.db.volume_update(context,
+                    volume_ref['id'],
+                        {'status': 'error'}, local=True)
+
+    def _attach_local_volume(self, context, instance_id, volume_id, mountpoint):
+        """Attach a volume to an instance."""
+        context = context.elevated()
+        instance_ref = self.db.instance_get(context, instance_id)
+        volume_ref = self.db.volume_get(context, volume_id, local=True)
+        volume_name = volume_ref['name']
+
+        LOG.audit(_("instance %(instance_id)s: attaching volume %(volume_name)s"
+                    " to %(mountpoint)s") % locals(), context=context)
+
+        try:
+            self.driver.attach_local_volume(instance_ref['name'],
+                volume_name,
+                mountpoint)
+            self.db.volume_attached(context,
+                volume_id,
+                instance_id,
+                mountpoint, local=True)
+            values = {
+                'instance_id': instance_id,
+                'device_name': mountpoint,
+                'delete_on_termination': False,
+                'virtual_name': None,
+                'snapshot_id': None,
+                'volume_id': volume_id,
+                'volume_size': None,
+                'no_device': None, }
+            self.db.block_device_mapping_create(context, values)
+        except Exception as exc:  # pylint: disable=W0702
+            # NOTE(vish): The inline callback eats the exception info so we
+            #             log the traceback here and reraise the same
+            #             ecxception below.
+            LOG.exception(_("instance %(instance_id)s: attach failed"
+                            " %(mountpoint)s") % locals(), context=context)
+            self.db.volume_update(context,
+                    volume_ref['id'], {'status': 'error'}, local=True)
+            raise exc
+
+        return True
+
     def _attach_volume_boot(self, context, instance_id, volume_id, mountpoint):
         """Attach a volume to an instance at boot time. So actual attach
         is done by instance creation"""
@@ -1318,11 +1488,11 @@ class ComputeManager(manager.SchedulerDependentManager):
 
     @exception.wrap_exception(notifier=notifier, publisher_id=publisher_id())
     @checks_instance_lock
-    def _detach_volume(self, context, instance_id, volume_id, destroy_bdm):
+    def _detach_volume(self, context, instance_id, volume_id, destroy_bdm, local=False):
         """Detach a volume from an instance."""
         context = context.elevated()
         instance_ref = self.db.instance_get(context, instance_id)
-        volume_ref = self.db.volume_get(context, volume_id)
+        volume_ref = self.db.volume_get(context, volume_id, local)
         mp = volume_ref['mountpoint']
         LOG.audit(_("Detach volume %(volume_id)s from mountpoint %(mp)s"
                 " on instance %(instance_id)s") % locals(), context=context)
@@ -1332,8 +1502,9 @@ class ComputeManager(manager.SchedulerDependentManager):
         else:
             self.driver.detach_volume(instance_ref['name'],
                                       volume_ref['mountpoint'])
-        self.volume_manager.remove_compute_volume(context, volume_id)
-        self.db.volume_detached(context, volume_id)
+        if not local:
+            self.volume_manager.remove_compute_volume(context, volume_id)
+        self.db.volume_detached(context, volume_id, local)
         if destroy_bdm:
             self.db.block_device_mapping_destroy_by_instance_and_volume(
                 context, instance_id, volume_id)
@@ -1342,6 +1513,10 @@ class ComputeManager(manager.SchedulerDependentManager):
     def detach_volume(self, context, instance_id, volume_id):
         """Detach a volume from an instance."""
         return self._detach_volume(context, instance_id, volume_id, True)
+
+    def _detach_local_volume(self, context, instance_id, volume_id):
+        """Detach a volume from an instance."""
+        return self._detach_volume(context, instance_id, volume_id, True, local=True)
 
     def remove_volume(self, context, volume_id):
         """Remove volume on compute host.
