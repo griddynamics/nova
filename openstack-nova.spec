@@ -220,7 +220,7 @@ Group:            Applications/System
 
 Requires:   %{name} = %{epoch}:%{version}-%{release}
 Requires:         start-stop-daemon
-Requires:         openstack-noVNC >= %{epoch}:%{version}
+Requires:         openstack-noVNC >= %{epoch}:2011.3
 
 %description      vncproxy
 Nova is a cloud computing fabric controller (the main part of an IaaS system)
