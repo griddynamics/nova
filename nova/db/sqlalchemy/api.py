@@ -1183,6 +1183,7 @@ def _build_instance_get(context, session=None):
                      options(joinedload('virtual_interfaces')).\
                      options(joinedload_all('security_groups.rules')).\
                      options(joinedload('volumes')).\
+                     options(joinedload('local_volumes')).\
                      options(joinedload('metadata')).\
                      options(joinedload('instance_type'))
 
