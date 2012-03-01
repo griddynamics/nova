@@ -153,7 +153,7 @@ Requires:         lvm2
 Requires:         socat
 Requires:         coreutils
 Requires:         python-libguestfs >= 1.7.17
-Requires:         python-kombu
+Requires:         python-kombu >= 2.0.0
 
 %description -n   python-nova
 Nova is a cloud computing fabric controller (the main part of an IaaS system)
