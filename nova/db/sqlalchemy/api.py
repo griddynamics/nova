@@ -1611,6 +1611,16 @@ def instance_get_actions(context, instance_id):
        all()
 
 
+def instance_get_security_groups(context, instance_id):
+    session = get_session()
+
+    groups = session.query(models.SecurityGroup).\
+        join(models.SecurityGroupInstanceAssociation).\
+        filter_by(instance_id=instance_id)
+
+    return groups
+
+
 ###################
 
 
