@@ -601,6 +601,16 @@ class Controller(object):
 
         return webob.Response(status_int=202)
 
+    def list_sg(self, req, id):
+        context = req.environ["nova.context"]
+        result = db.instance_get_security_groups(context, id)
+        names = []
+
+        for res in result:
+            names.append(res['name'])
+
+        return {'result': names}
+
 
 class ControllerV10(Controller):
     """v1.0 OpenStack API controller"""
