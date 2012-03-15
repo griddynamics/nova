@@ -99,6 +99,7 @@ class LocalAPI(base.Base):
             "device": device,
             "volume_id": volume['id'],
             "snapshot_id" : snapshot_id,
+            "size": size
             })
         return volume
 

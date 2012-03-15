@@ -1295,11 +1295,11 @@ class ComputeManager(manager.SchedulerDependentManager):
         instance_ref = self.db.instance_get(context, instance_id)
         return self.driver.get_vnc_console(instance_ref)
 
-    def create_local_volume(self, context, instance_id, device, volume_id, snapshot_id):
-        self._create_local_volume(context, instance_id, device, volume_id, snapshot_id)
+    def create_local_volume(self, context, instance_id, device, volume_id, snapshot_id, size):
+        self._create_local_volume(context, instance_id, device, volume_id, snapshot_id, size)
         self._attach_local_volume(context, instance_id, volume_id, device)
 
-    def _create_local_volume(self, context, instance_id, device, volume_id, snapshot_id):
+    def _create_local_volume(self, context, instance_id, device, volume_id, snapshot_id, vol_size):
 
         context = context.elevated()
 
@@ -1316,7 +1316,6 @@ class ComputeManager(manager.SchedulerDependentManager):
 
         try:
             vol_name = volume_ref['name']
-            vol_size = volume_ref['size']
             vol_size_g = str(int(vol_size) * 1.0 / (1024 * 1024 * 1024))
             LOG.debug(_("volume %(vol_name)s: creating local volume of"
                         " size %(vol_size_g)sG") % locals())
@@ -1409,16 +1408,6 @@ class ComputeManager(manager.SchedulerDependentManager):
                 volume_id,
                 instance_id,
                 mountpoint, local=True)
-            values = {
-                'instance_id': instance_id,
-                'device_name': mountpoint,
-                'delete_on_termination': False,
-                'virtual_name': None,
-                'snapshot_id': None,
-                'volume_id': volume_id,
-                'volume_size': None,
-                'no_device': None, }
-            self.db.block_device_mapping_create(context, values)
         except Exception as exc:  # pylint: disable=W0702
             # NOTE(vish): The inline callback eats the exception info so we
             #             log the traceback here and reraise the same
