@@ -1842,42 +1842,37 @@ class LibvirtConnection(driver.ComputeDriver):
         os.mkdir(instance_dir)
 
         for info in disk_info:
-            base = os.path.basename(info['path'])
-            # Get image type and create empty disk image, and
-            # create backing file in case of qcow2.
-            instance_disk = os.path.join(instance_dir, base)
-            if not info['backing_file']:
-                utils.execute('qemu-img', 'create', '-f', info['type'],
-                              instance_disk, info['local_gb'])
+            image_name = os.path.basename(info['path'])
+            image = self.image_driver.create_image(instance_ref['name'], image_name)
 
-            else:
+            if info['backing_file']:
                 # Creating backing file follows same way as spawning instances.
-                backing_file = os.path.join(FLAGS.instances_path,
-                                            '_base', info['backing_file'])
+                cache_name = os.path.basename(info['backing_file'])
+                # Remove any size tags which the cache manages
+                cache_name = cache_name.split('_')[0]
 
-                if not os.path.exists(backing_file):
-                    base = self._cache_image(fn=self._fetch_image,
-                        context=ctxt,
-                        fname=info['backing_file'],
-                        image_id=instance_ref['image_ref'],
-                        user_id=instance_ref['user_id'],
-                        project_id=instance_ref['project_id'],
-                        size=instance_ref['local_gb'])
+                backing_path = self._cache_image(fn=self._fetch_image,
+                    context=ctxt,
+                    fname=cache_name,
+                    image_id=instance_ref['image_ref'],
+                    user_id=instance_ref['user_id'],
+                    project_id=instance_ref['project_id'],
+                    size=info['disk_virtual_size'])
 
-                utils.execute('qemu-img', 'create', '-f', info['type'],
-                          '-o', 'backing_file=%s' % base,
-                          instance_disk, info['local_gb'])
+                image.create_from_raw(backing_path)
+            else:
+                image.create_clean(info['disk_virtual_size'])
 
         # if image has kernel and ramdisk, just download
         # following normal way.
         if instance_ref['kernel_id']:
-            self._fetch_image(nova_context.get_admin_context(),
+            self._fetch_image(ctxt,
                               os.path.join(instance_dir, 'kernel'),
                               instance_ref['kernel_id'],
                               instance_ref['user_id'],
                               instance_ref['project_id'])
             if instance_ref['ramdisk_id']:
-                self._fetch_image(nova_context.get_admin_context(),
+                self._fetch_image(ctxt,
                                   os.path.join(instance_dir, 'ramdisk'),
                                   instance_ref['ramdisk_id'],
                                   instance_ref['user_id'],
@@ -1964,6 +1959,8 @@ class LibvirtConnection(driver.ComputeDriver):
                     for i in out.split('\n') if 0 <= i.find('backing file')]
                 backing_file = os.path.basename(backing_file[0])
 
+            virtual_size = size
+
             # block migration needs same/larger size of empty image on the
             # destination host. since qemu-img creates bit smaller size image
             # depending on original image size, fixed value is necessary.
@@ -1979,7 +1976,8 @@ class LibvirtConnection(driver.ComputeDriver):
                 break
 
             disk_info.append({'type': disk_type, 'path': path,
-                              'local_gb': size, 'backing_file': backing_file})
+                              'local_gb': size, 'backing_file': backing_file,
+                              'disk_virtual_size': virtual_size})
 
         return utils.dumps(disk_info)
 

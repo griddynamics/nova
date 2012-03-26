@@ -1227,6 +1227,20 @@ class API(base.Base):
                               "instance_id": instance_ref['uuid'],
                               "instance_type_id": new_instance_type['id']}})
 
+
+    @scheduler_api.reroute_compute("live_migration")
+    def live_migration(self, context, instance_id, destination, block_migration):
+        """
+        Perform live migration of VM
+        """
+        self._cast_scheduler_message(context,
+                    {"method": "live_migration",
+                        "args": {"topic": FLAGS.compute_topic,
+                                 "instance_id": instance_id,
+                                 "dest": destination,
+                                 "block_migration": block_migration
+        }})
+
     @scheduler_api.reroute_compute("add_fixed_ip")
     def add_fixed_ip(self, context, instance_id, network_id):
         """Add fixed_ip from specified network to given instance."""

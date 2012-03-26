@@ -222,6 +222,7 @@ class Controller(object):
         if FLAGS.allow_admin_api:
             admin_actions = {
                 'createBackup': self._action_create_backup,
+                'live_migrate': self._action_live_migrate
             }
             _actions.update(admin_actions)
 
@@ -489,6 +490,16 @@ class Controller(object):
             readable = traceback.format_exc()
             LOG.exception(_("compute.api::resume %s"), readable)
             raise exc.HTTPUnprocessableEntity()
+        return webob.Response(status_int=202)
+
+    def _action_live_migrate(self, body, req, id):
+        try:
+            block_migration = body['live_migrate']['block_migration']
+            dest = body['live_migrate']['destination']
+            self.compute_api.live_migration(req.environ['nova.context'], id, dest, block_migration)
+        except Exception, e:
+            LOG.exception(_("Error in live migration %s"), e)
+            raise exc.HTTPBadRequest()
         return webob.Response(status_int=202)
 
     @scheduler_api.redirect_handler
