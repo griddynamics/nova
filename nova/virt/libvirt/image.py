@@ -113,7 +113,7 @@ class LvmImageDriver(ImageDriver):
         return 'raw'
 
     @classmethod
-    def create_image(cls, instance_name, image_name=None, suffix=None):
+    def create_image(cls, instance_name, image_name, suffix=None):
         lv_name = cls._lv_name(instance_name, image_name, suffix)
         return LvmImage(FLAGS.lvm_volume_group, lv_name)
 
