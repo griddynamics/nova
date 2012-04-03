@@ -610,7 +610,9 @@ def instance_get_actions(context, instance_id):
     """Get instance actions by instance id."""
     return IMPL.instance_get_actions(context, instance_id)
 
+
 def instance_get_security_groups(context, instance_id):
+    """Get instance security groups by instance id"""
     return IMPL.instance_get_security_groups(context, instance_id)
 
 ###################

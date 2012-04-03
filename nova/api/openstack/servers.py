@@ -593,15 +593,19 @@ class Controller(object):
 
         return webob.Response(status_int=202)
 
-    def list_sg(self, req, id):
+    def list_security_groups(self, req, id):
         context = req.environ["nova.context"]
         result = db.instance_get_security_groups(context, id)
-        names = []
-
-        for res in result:
-            names.append(res['name'])
+        names = [res['name'] for res in result]
 
         return {'result': names}
+
+    def host(self, req, id):
+        context = req.environ["nova.context"]
+        if context.is_admin:
+            result = db.instance_get(context, id)
+            return {'result': result['host']}
+        return {'result': None}
 
 
 class ControllerV10(Controller):
