@@ -126,7 +126,8 @@ class APIRouter(base_wsgi.Router):
             server_members['unrescue'] = 'POST'
             server_members['reset_network'] = 'POST'
             server_members['inject_network_info'] = 'POST'
-            server_members['list_sg'] = 'GET'
+            server_members['list_security_groups'] = 'GET'
+            server_members['host'] = 'GET'
 
             mapper.resource("user", "users",
                         controller=users.create_resource(),
