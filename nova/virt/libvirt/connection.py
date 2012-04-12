@@ -891,8 +891,7 @@ class LibvirtConnection(driver.ComputeDriver):
         if fs_format:
             utils.execute('mkfs', '-t', fs_format, target)
 
-    def _create_ephemeral(self, target, local_size, fs_label, os_type):
-        self._create_local(target, local_size)
+    def _create_ephemeral(self, target, fs_label, os_type):
         disk.mkfs(os_type, fs_label, target)
 
     def _create_swap(self, target, swap_mb):
@@ -936,6 +935,14 @@ class LibvirtConnection(driver.ComputeDriver):
             if not os.path.exists(target):
                 base = self._cache_image(fn, fname, *args, **kwargs)
                 image.create_from_raw(base, size)
+
+        def create_clean_image(fn, name, size, *args, **kwargs):
+            image = self.image_driver.create_image(inst['name'], name, suffix)
+            target = image.path()
+            if not os.path.exists(target):
+                image.create_clean(size)
+                fn(target, *args, **kwargs)
+
 
         # ensure directories exist and are writable
         utils.execute('mkdir', '-p', basepath(suffix=''))
@@ -997,16 +1004,14 @@ class LibvirtConnection(driver.ComputeDriver):
                                        fs_label='ephemeral0',
                                        os_type=inst.os_type)
 
-                fname = 'ephemeral_%s_%s_%s' % ('0', local_gb, inst.os_type)
-                create_image(fn, 'disk.local', fname, local_size=local_gb)
+                create_clean_image(fn, 'disk.local', size=size)
 
         for eph in driver.block_device_info_get_ephemerals(block_device_info):
             fn = functools.partial(self._create_ephemeral,
                                    fs_label='ephemeral%d' % eph['num'],
                                    os_type=inst.os_type)
 
-            fname = 'ephemeral_%s_%s_%s' % (eph['num'], eph['size'], inst.os_type)
-            create_image(fn, _get_eph_disk(eph), fname, local_size=local_gb)
+            create_clean_image(fn, _get_eph_disk(eph), size=size)
 
         swap_mb = 0
 
