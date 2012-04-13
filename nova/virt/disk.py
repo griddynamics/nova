@@ -99,6 +99,16 @@ def extend(image, size):
     utils.execute('e2fsck', '-fp', image, check_exit_code=False)
     utils.execute('resize2fs', image, check_exit_code=False)
 
+def inject_fs(image, fs_type='ext3'):
+    """
+    Perform mkfs trough libguestfs
+    """
+    gfs = utils.import_class('guestfs.GuestFS')()
+    gfs.add_drive(image)
+    gfs.launch()
+    devices = gfs.list_devices()
+    gfs.mkfs(fs_type, devices[-1])
+    gfs.sync()
 
 def inject_data(image, key=None, nets=None, metadata=None, injected_files=None, admin_pass=None):
     """Injects a ssh key and optionally net data into a disk image.

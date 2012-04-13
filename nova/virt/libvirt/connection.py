@@ -892,7 +892,7 @@ class LibvirtConnection(driver.ComputeDriver):
             utils.execute('mkfs', '-t', fs_format, target)
 
     def _create_ephemeral(self, target, fs_label, os_type):
-        disk.mkfs(os_type, fs_label, target)
+        disk.inject_fs(target)
 
     def _create_swap(self, target, swap_mb):
         """Create a swap file of specified size"""
