@@ -32,6 +32,8 @@ from nova import flags
 from nova import log as logging
 from nova import utils
 from nova.virt.injector import GuestFsInjector
+from nova.virt.netcfg import NetConfig
+from crypt import crypt
 
 
 LOG = logging.getLogger('nova.compute.disk')
