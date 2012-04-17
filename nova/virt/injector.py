@@ -22,15 +22,10 @@ from functools import wraps
 
 from nova import utils
 
-<<<<<<< HEAD
 
 def _abs_path(method):
     """Decorator that used to wrap FileInjector methods
     which accept path as first argument"""
-=======
-def _abs_path(method):
-    """Decorator that used to wrap FileInjector methods which accept path as first argument"""
->>>>>>> Use GuestFS to inject files with libvirt
     @wraps(method)
     def wrapper(obj, path, *args, **kwargs):
         return method(obj, obj.abs_path(path), *args, **kwargs)
@@ -45,13 +40,6 @@ class FileInjector:
     def root(self):
         return self.__root
 
-<<<<<<< HEAD
-    def get_os_type(self):
-        # todo: implement some heuristic
-        return "ubuntu"
-
-=======
->>>>>>> Use GuestFS to inject files with libvirt
     def abs_path(self, path):
         p = path
         if p.startswith(os.path.sep):
@@ -83,12 +71,8 @@ class FileInjector:
 
         mode should be integer.
         """
-<<<<<<< HEAD
         utils.execute(('chmod', '{0:o}'.format(mode), path),
             check_exit_code=True, run_as_root=True)
-=======
-        utils.execute(('chmod', '{0:o}'.format(mode), path), check_exit_code=True, run_as_root=True)
->>>>>>> Use GuestFS to inject files with libvirt
 
     @_abs_path
     def chown(self, path, uid=None, gid=None):
@@ -101,12 +85,8 @@ class FileInjector:
             param = uid
         else:
             param = uid + ':' + gid
-<<<<<<< HEAD
         utils.execute(('chown', param, path),
             check_exit_code=True, run_as_root=True)
-=======
-        utils.execute(('chown', param, path), check_exit_code=True, run_as_root=True)
->>>>>>> Use GuestFS to inject files with libvirt
 
     @_abs_path
     def write(self, path, content):
@@ -115,15 +95,10 @@ class FileInjector:
 
     @_abs_path
     def write_append(self, path, content):
-<<<<<<< HEAD
         """Append content to the file.
         If file is not exists then create it first."""
         utils.execute('tee', '-a', path,
             process_input=content, run_as_root=True)
-=======
-        """Append content to the file. If file is not exists then create it first."""
-        utils.execute('tee', '-a', path, process_input=content, run_as_root=True)
->>>>>>> Use GuestFS to inject files with libvirt
 
     def __enter__(self):
         return self
@@ -153,7 +128,6 @@ class GuestFsInjector:
         self.__gfs = self.init_guestfs()
         self.__gfs.add_drive(image)
         self.__gfs.launch()
-<<<<<<< HEAD
         self.__root = self.__find_root()
         self.__gfs.resize2fs(self.__root)
         self.__gfs.mount(self.__root, '/')
@@ -163,10 +137,6 @@ class GuestFsInjector:
         if self.__os_type is None:
             self.__os_type = self.__gfs.inspect_get_distro(self.__root)
         return self.__os_type
-=======
-        root = self.__find_root()
-        self.__gfs.mount(root, '/')
->>>>>>> Use GuestFS to inject files with libvirt
 
     def __find_root(self):
         roots = self.__gfs.inspect_os()
@@ -218,12 +188,9 @@ class GuestFsInjector:
             old_content = ''
         return self.__gfs.write(path, old_content + content)
 
-<<<<<<< HEAD
     def read_lines(self, path):
         return self.__gfs.read_lines(path)
 
-=======
->>>>>>> Use GuestFS to inject files with libvirt
     def __enter__(self):
         return self
 
@@ -231,9 +198,5 @@ class GuestFsInjector:
         self.free()
 
     def free(self):
-<<<<<<< HEAD
         self.__gfs.umount_all()
-=======
-        self.__gfs.unmount_all()
->>>>>>> Use GuestFS to inject files with libvirt
         self.__gfs.sync()
