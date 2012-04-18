@@ -109,7 +109,7 @@ case "$1" in
         restart
     ;;
     condrestart)
-        if [ -n "`pidofproc-p$pidfile$binfile`" ]; then
+        if [ -n "`pidofproc -p $pidfile $binfile`" ]; then
             restart
         fi
     ;;
