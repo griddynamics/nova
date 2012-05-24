@@ -133,6 +133,7 @@ class GuestFsInjector:
         self.__gfs.add_drive(image)
         self.__gfs.launch()
         self.__root = self.__find_root()
+        self.__gfs.e2fsck_f(self.__root)
         self.__gfs.resize2fs(self.__root)
         self.__gfs.mount(self.__root, '/')
         self.__os_type = None
